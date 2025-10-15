@@ -1,31 +1,40 @@
-// Nenhum import de banco de dados é necessário, pois não vamos usá-lo aqui.
-
 export default function handler(req, res) {
-  // 1. Verificamos se o método é POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  // 2. Pegamos o usuário e senha que o usuário digitou no formulário
   const { username, password } = req.body;
 
   try {
-    // 3. Pegamos as credenciais corretas das variáveis de ambiente da Vercel
     const correctUser = process.env.LOGIN_USER;
     const correctPass = process.env.LOGIN_PASS;
 
-    // 4. Comparamos as informações enviadas com as variáveis de ambiente
+    // Depuração para ver os valores que estão sendo comparados
+    console.log(`Comparando: '${username}' vs '${correctUser}' E '${password}' vs '${correctPass}'`);
+
     if (username === correctUser && password === correctPass) {
-      // Se as credenciais estiverem corretas, criamos o cookie de sessão
-      res.setHeader('Set-Cookie', 'app_session=valid; HttpOnly; Path=/; Max-Age=3600'); // Cookie dura 1 hora
+      
+      // --- INÍCIO DA CORREÇÃO ---
+      console.log("SUCESSO: Credenciais corretas. Tentando criar o cookie...");
+
+      // 1. Criamos a string do cookie da forma mais simples possível.
+      const cookieString = 'app_session=valid';
+
+      // 2. Adicionamos um log para garantir que a string não está vazia.
+      console.log("Cookie string a ser enviada:", cookieString);
+
+      // 3. Enviamos o cabeçalho com a string simplificada.
+      res.setHeader('Set-Cookie', cookieString);
+      
+      console.log("Cabeçalho Set-Cookie foi configurado.");
+      // --- FIM DA CORREÇÃO ---
 
       return res.status(200).json({ message: 'Login successful' });
     } else {
-      // Se as credenciais estiverem erradas, retornamos um erro
+      console.log("FALHA: Credenciais não batem.");
       return res.status(401).json({ error: 'Invalid credentials' });
     }
   } catch (error) {
-    // Bloco de segurança para caso algo inesperado aconteça
     console.error('Authentication error:', error);
     return res.status(500).json({ error: 'Internal Server Error' });
   }
