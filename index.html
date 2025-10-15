@@ -142,11 +142,25 @@
                  <button type="button" class="btn btn-primary" onclick="salvarOrcamento()" style="background: linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%);">💾 Salvar Orçamento</button>
             </div>
         </div>
-        <div style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 15px; font-size: 11px;">v5.0.1-vercel</div>
+        <div style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 15px; font-size: 11px;">v5.0.2-vercel</div>
     </div>
     
     <div id="shareModal" class="modal-overlay">
+         <div class="modal-content">
+            <div class="modal-header"><h2>📤 Compartilhar Orçamento</h2><p>Escolha como deseja salvar ou compartilhar</p></div>
+            <div class="share-options">
+                <div class="share-option" onclick="baixarPDF()">
+                    <div class="share-option-icon download-icon">📄</div>
+                    <div class="share-option-content"><h3>Baixar PDF</h3><p>Documento completo</p></div>
+                </div>
+                <div class="share-option" onclick="encaminharWhatsApp()">
+                    <div class="share-option-icon whatsapp-icon">💬</div>
+                    <div class="share-option-content"><h3>WhatsApp</h3><p>Enviar para o cliente</p></div>
+                </div>
+            </div>
+            <div class="modal-footer"><button class="btn-close" onclick="fecharModal()">Fechar</button></div>
         </div>
+    </div>
 
     <script>
         let itens = [];
@@ -161,11 +175,13 @@
             if (document.cookie.includes('app_session=valid')) {
                 document.getElementById('login-container').classList.add('hidden');
                 document.getElementById('app-container').classList.remove('hidden');
+                document.body.style.alignItems = 'flex-start';
                 carregarClientes();
                 atualizarTabelaItens();
             } else {
                 document.getElementById('login-container').classList.remove('hidden');
                 document.getElementById('app-container').classList.add('hidden');
+                document.body.style.alignItems = 'center';
             }
         }
         
@@ -174,7 +190,7 @@
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             const errorMessage = document.getElementById('error-message');
-            errorMessage.style.display = 'none';
+            errorMessage.textContent = '';
 
             try {
                 const response = await fetch('/api/auth', {
@@ -184,15 +200,13 @@
                 });
 
                 if (response.ok) {
-                    checkLoginStatus(); // Se o login for bem-sucedido, mostra o app
+                    checkLoginStatus();
                 } else {
                     const data = await response.json();
                     errorMessage.textContent = data.error || 'Credenciais inválidas.';
-                    errorMessage.style.display = 'block';
                 }
             } catch (error) {
                 errorMessage.textContent = 'Erro de conexão. Tente novamente.';
-                errorMessage.style.display = 'block';
             }
         });
 
@@ -662,7 +676,6 @@
         
         // --- INICIALIZAÇÃO ---
         window.onload = function() {
-            // A verificação de login agora é a primeira coisa a acontecer
             checkLoginStatus();
         };
     </script>
