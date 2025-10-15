@@ -20,6 +20,7 @@
         .form-group { display: flex; flex-direction: column; }
         .form-group label { font-weight: 600; color: #2c3e50; margin-bottom: 8px; font-size: 0.9rem; }
         .form-group input, .form-group select, .form-group textarea { padding: 12px 15px; border: 2px solid #e9ecef; border-radius: 10px; font-size: 1rem; transition: all 0.3s ease; background: white; }
+        .form-group input[readonly] { background: #f8f9fa; color: #6c757d; }
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #FF6B35; box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1); }
         .btn { padding: 12px 25px; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 8px; }
         .btn-primary { background: linear-gradient(135deg, #FF6B35 0%, #FFA500 100%); color: white; }
@@ -104,14 +105,14 @@
 
             <div class="section">
                 <h2>📝 Observações</h2>
-                <div class="form-group"><label for="observacoes">Observações Adicionais</label><textarea id="observacoes" placeholder="Condições de pagamento, prazo de entrega, garantias, etc.">Forma de pagamento: 50% na encomenda e 50% na entrega. Prazo de entrega: 30 dias a partir da confirmação do pedido.</textarea></div>
+                <div class="form-group"><label for="observacoes">Observações Adicionais</label><textarea id="observacoes" placeholder="Condições de pagamento, prazo de entrega, etc.">Forma de pagamento: 50% na encomenda e 50% na entrega. Prazo de entrega: 30 dias a partir da confirmação do pedido.</textarea></div>
             </div>
 
             <div class="section" style="text-align: center;">
                 <button type="button" class="btn btn-success" onclick="gerarPDF()">📄 Gerar Orçamento em PDF</button>
             </div>
         </div>
-        <div style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 15px; font-size: 11px;">v4.2.1-vercel</div>
+        <div style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 15px; font-size: 11px;">v4.2.2-vercel</div>
     </div>
     
     <div id="shareModal" class="modal-overlay">
@@ -278,6 +279,10 @@
             document.getElementById('itemValorUnitario').value = '';
         }
 
+        function formatarMoeda(valor) {
+            return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
         function atualizarTabelaItens() {
             const container = document.getElementById('itensContainer');
             if (itens.length === 0) {
@@ -356,8 +361,148 @@
         }
 
         function continuarGeracaoPDF(doc, pageWidth, margin, yPosition) {
-            // (A lógica de criação do PDF permanece a mesma)
-            // ...
+            doc.setFontSize(22);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(44, 62, 80);
+            doc.text('ORÇAMENTO', pageWidth / 2, yPosition, { align: 'center' });
+            yPosition += 15;
+
+            const infoStartY = yPosition;
+            let leftY = infoStartY;
+            let rightY = infoStartY;
+            const halfWidth = pageWidth / 2;
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(44, 62, 80);
+            doc.text('DADOS DA EMPRESA', margin, leftY);
+            leftY += 5;
+            doc.setLineWidth(0.2);
+            doc.line(margin, leftY, halfWidth - margin / 2, leftY);
+            leftY += 8;
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(80, 80, 80);
+            doc.setFont('helvetica', 'bold');
+            doc.text(document.getElementById('empresaNome').value.trim(), margin, leftY);
+            leftY += 6;
+            doc.setFont('helvetica', 'normal');
+            const empresaCNPJ = document.querySelector('input[value="12.000.234/0001-18"]');
+            if (empresaCNPJ) { doc.text(`CNPJ: ${empresaCNPJ.value}`, margin, leftY); leftY += 5; }
+            const empresaEndereco = document.querySelector('input[value="Rua Pinheiro, 65 - Cidade Universitária"]');
+            if (empresaEndereco) { doc.text(empresaEndereco.value, margin, leftY); leftY += 5; }
+            const empresaTelefone = document.querySelector('input[value="(82) 98814-4752"]');
+            if (empresaTelefone) { doc.text(`Telefone: ${empresaTelefone.value}`, margin, leftY); leftY += 5; }
+            const empresaEmail = document.querySelector('input[value="fenixfardamentos.al@gmail.com"]');
+            if (empresaEmail) { doc.text(`E-mail: ${empresaEmail.value}`, margin, leftY); leftY += 5; }
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(44, 62, 80);
+            doc.text('DADOS DO CLIENTE', halfWidth, rightY);
+            rightY += 5;
+            doc.line(halfWidth, rightY, pageWidth - margin, rightY);
+            rightY += 8;
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(80, 80, 80);
+            doc.setFont('helvetica', 'bold');
+            doc.text(document.getElementById('clienteNome').value.trim(), halfWidth, rightY);
+            rightY += 6;
+            doc.setFont('helvetica', 'normal');
+            const clienteEmail = document.getElementById('clienteEmail').value.trim();
+            if (clienteEmail) { doc.text(`E-mail: ${clienteEmail}`, halfWidth, rightY); rightY += 5; }
+            const clienteTelefone = document.getElementById('clienteTelefone').value.trim();
+            if (clienteTelefone) { doc.text(`Telefone: ${clienteTelefone}`, halfWidth, rightY); rightY += 5; }
+            const clienteCnpjCpf = document.getElementById('clienteCnpjCpf').value.trim();
+            if (clienteCnpjCpf) { doc.text(`CPF/CNPJ: ${clienteCnpjCpf}`, halfWidth, rightY); rightY += 5; }
+
+            yPosition = Math.max(leftY, rightY) + 15;
+
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(255, 107, 53);
+            doc.text('ITENS DO ORÇAMENTO:', margin, yPosition);
+            yPosition += 12;
+
+            const tableData = itens.map((item, index) => [
+                index + 1, item.descricao, item.quantidade, formatarMoeda(item.valorUnitario), formatarMoeda(item.valorTotal)
+            ]);
+            doc.autoTable({
+                head: [['#', 'Descrição', 'Qtd', 'V. Unitário', 'Total']],
+                body: tableData,
+                startY: yPosition,
+                theme: 'grid',
+                headStyles: { fillColor: [255, 107, 53], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
+                columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 1: { halign: 'left' }, 2: { halign: 'center', cellWidth: 15 }, 3: { halign: 'right', cellWidth: 30 }, 4: { halign: 'right', cellWidth: 30 } }
+            });
+            yPosition = doc.previousAutoTable.finalY;
+
+            const subtotal = dadosOrcamento.totalGeral;
+            const desconto = parseCurrency(document.getElementById('descontoValor')?.value);
+            const totalFinal = subtotal - desconto;
+            yPosition += 10;
+            const totalBoxX = pageWidth / 2;
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(80, 80, 80);
+            doc.text('Subtotal:', totalBoxX, yPosition, { align: 'left' });
+            doc.text(formatarMoeda(subtotal), pageWidth - margin, yPosition, { align: 'right' });
+            yPosition += 7;
+            doc.text('Desconto:', totalBoxX, yPosition, { align: 'left' });
+            doc.text(`- ${formatarMoeda(desconto)}`, pageWidth - margin, yPosition, { align: 'right' });
+            yPosition += 7;
+            doc.setLineWidth(0.3);
+            doc.setDrawColor(150, 150, 150);
+            doc.line(totalBoxX, yPosition, pageWidth - margin, yPosition);
+            yPosition += 8;
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(44, 62, 80);
+            doc.text('TOTAL GERAL:', totalBoxX, yPosition, { align: 'left' });
+            doc.text(formatarMoeda(totalFinal), pageWidth - margin, yPosition, { align: 'right' });
+            yPosition += 15;
+
+            const observacoes = document.getElementById('observacoes').value.trim();
+            if (observacoes) {
+                const pageHeight = doc.internal.pageSize.height;
+                const footerHeight = 25;
+                const obsLines = doc.splitTextToSize(observacoes, pageWidth - margin * 2);
+                if (yPosition + (obsLines.length * 5) + 15 > pageHeight - footerHeight) {
+                    doc.addPage();
+                    yPosition = 20;
+                }
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(44, 62, 80);
+                doc.text('OBSERVAÇÕES', margin, yPosition);
+                yPosition += 5;
+                doc.setLineWidth(0.2);
+                doc.line(margin, yPosition, 60, yPosition);
+                yPosition += 8;
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(80, 80, 80);
+                doc.text(obsLines, margin, yPosition);
+            }
+
+            const dataAtual = new Date();
+            const dataFormatada = dataAtual.toLocaleDateString('pt-BR');
+            const totalPages = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                doc.setPage(i);
+                const pageHeight = doc.internal.pageSize.height;
+                const footerY = pageHeight - 15;
+                doc.setLineWidth(0.3);
+                doc.setDrawColor(200, 200, 200);
+                doc.line(margin, footerY, pageWidth - margin, footerY);
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(120, 120, 120);
+                doc.text(`Emitido em: ${dataFormatada}`, margin, footerY + 5);
+                doc.text('Este orçamento tem validade de 30 dias.', pageWidth / 2, footerY + 5, { align: 'center' });
+                doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin, footerY + 5, { align: 'right' });
+            }
             pdfGerado = doc;
             document.getElementById('shareModal').style.display = 'flex';
         }
@@ -377,7 +522,7 @@
 
         function fecharModal() { document.getElementById('shareModal').style.display = 'none'; }
         function baixarPDF() { if (pdfGerado) pdfGerado.save(`Orcamento_${dadosOrcamento.clienteNome.replace(/\s+/g, '_')}.pdf`); }
-        function baixarImagem() { /* Lógica de imagem aqui */ }
+        function baixarImagem() { /* ... Lógica de imagem ... */ }
         
         // --- INICIALIZAÇÃO ---
         window.onload = function() {
