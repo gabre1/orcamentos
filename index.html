@@ -111,7 +111,7 @@
                 <button type="button" class="btn btn-success" onclick="gerarPDF()">📄 Gerar Orçamento em PDF</button>
             </div>
         </div>
-        <div style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 15px; font-size: 11px;">v4.2.3-vercel</div>
+        <div style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 15px; font-size: 11px;">v4.2.4-vercel</div>
     </div>
     
     <div id="shareModal" class="modal-overlay">
@@ -281,7 +281,6 @@
             const container = document.getElementById('itensContainer');
             if (itens.length === 0) {
                 container.innerHTML = `<div class="empty-state"><h3>Nenhum item adicionado</h3></div>`;
-                document.getElementById('totaisContainer').innerHTML = '';
             } else {
                  container.innerHTML = `
                     <table class="items-table">
@@ -361,7 +360,13 @@
             const logoImg = new Image();
             logoImg.crossOrigin = 'anonymous';
             logoImg.onload = function() {
-                const logoWidth = 60, logoHeight = 20;
+                const logoWidth = 60;
+                // --- INÍCIO DA CORREÇÃO ---
+                // Calcula a altura proporcionalmente à largura original da imagem
+                const aspectRatio = this.naturalHeight / this.naturalWidth;
+                const logoHeight = logoWidth * aspectRatio;
+                // --- FIM DA CORREÇÃO ---
+                
                 const logoX = (pageWidth - logoWidth) / 2;
                 doc.addImage(this, 'PNG', logoX, yPosition, logoWidth, logoHeight);
                 yPosition += logoHeight + 5;
