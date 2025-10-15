@@ -1,38 +1,32 @@
-// 1. Importe 'createPool' em vez de 'sql' para criar uma conexão customizada
-import { createPool } from '@vercel/postgres';
+// Nenhum import de banco de dados é necessário, pois não vamos usá-lo aqui.
 
-// 2. Crie um "pool" de conexão usando a variável de ambiente correta
-// O Node.js acessa as variáveis de ambiente da Vercel através de 'process.env'
-const dbPool = createPool({
-  connectionString: process.env.CLIENTES_POSTGRES_URL,
-});
- 
-export default async function handler(req, res) {
+export default function handler(req, res) {
+  // 1. Verificamos se o método é POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
- 
+
+  // 2. Pegamos o usuário e senha que o usuário digitou no formulário
   const { username, password } = req.body;
- 
+
   try {
-    // 3. Use o pool para fazer a query de forma segura (com parâmetros)
-    // Isso protege contra SQL Injection.
-    const { rows } = await dbPool.query(
-      'SELECT * FROM users WHERE username = $1 AND password = $2',
-      [username, password]
-    );
- 
-    if (rows.length > 0) {
-      // 4. Mantenha a lógica do cookie que já havíamos corrigido
-      res.setHeader('Set-Cookie', 'app_session=valid; HttpOnly; Path=/; Max-Age=3600');
- 
+    // 3. Pegamos as credenciais corretas das variáveis de ambiente da Vercel
+    const correctUser = process.env.LOGIN_USER;
+    const correctPass = process.env.LOGIN_PASS;
+
+    // 4. Comparamos as informações enviadas com as variáveis de ambiente
+    if (username === correctUser && password === correctPass) {
+      // Se as credenciais estiverem corretas, criamos o cookie de sessão
+      res.setHeader('Set-Cookie', 'app_session=valid; HttpOnly; Path=/; Max-Age=3600'); // Cookie dura 1 hora
+
       return res.status(200).json({ message: 'Login successful' });
     } else {
-      // Usuário não encontrado ou senha incorreta
+      // Se as credenciais estiverem erradas, retornamos um erro
       return res.status(401).json({ error: 'Invalid credentials' });
     }
   } catch (error) {
-    console.error('Database query error:', error);
+    // Bloco de segurança para caso algo inesperado aconteça
+    console.error('Authentication error:', error);
     return res.status(500).json({ error: 'Internal Server Error' });
   }
 }
