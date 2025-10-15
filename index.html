@@ -105,7 +105,7 @@
 
             <div class="section">
                 <h2>📝 Observações</h2>
-                <div class="form-group"><label for="observacoes">Observações Adicionais</label><textarea id="observacoes" placeholder="Condições de pagamento, prazo de entrega, etc.">Forma de pagamento: 50% na encomenda e 50% na entrega. Prazo de entrega: 30 dias a partir da confirmação do pedido.</textarea></div>
+                <div class="form-group"><label for="observacoes">Observações Adicionais</label><textarea id="observacoes" placeholder="Condições de pagamento, prazo de entrega, garantias, etc.">Forma de pagamento: 50% na encomenda e 50% na entrega. Prazo de entrega: 30 dias a partir da confirmação do pedido.</textarea></div>
             </div>
 
             <div class="section" style="text-align: center;">
@@ -384,17 +384,13 @@
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(80, 80, 80);
             doc.setFont('helvetica', 'bold');
-            doc.text(document.getElementById('empresaNome').value.trim(), margin, leftY);
+            doc.text(document.querySelector('input[value="Fenix Fardamentos LTDA"]').value, margin, leftY);
             leftY += 6;
             doc.setFont('helvetica', 'normal');
-            const empresaCNPJ = document.querySelector('input[value="12.000.234/0001-18"]');
-            if (empresaCNPJ) { doc.text(`CNPJ: ${empresaCNPJ.value}`, margin, leftY); leftY += 5; }
-            const empresaEndereco = document.querySelector('input[value="Rua Pinheiro, 65 - Cidade Universitária"]');
-            if (empresaEndereco) { doc.text(empresaEndereco.value, margin, leftY); leftY += 5; }
-            const empresaTelefone = document.querySelector('input[value="(82) 98814-4752"]');
-            if (empresaTelefone) { doc.text(`Telefone: ${empresaTelefone.value}`, margin, leftY); leftY += 5; }
-            const empresaEmail = document.querySelector('input[value="fenixfardamentos.al@gmail.com"]');
-            if (empresaEmail) { doc.text(`E-mail: ${empresaEmail.value}`, margin, leftY); leftY += 5; }
+            doc.text(`CNPJ: ${document.querySelector('input[value="12.000.234/0001-18"]').value}`, margin, leftY); leftY += 5;
+            doc.text(document.querySelector('input[value="Rua Pinheiro, 65 - Cidade Universitária"]').value, margin, leftY); leftY += 5;
+            doc.text(`Telefone: ${document.querySelector('input[value="(82) 98814-4752"]').value}`, margin, leftY); leftY += 5;
+            doc.text(`E-mail: ${document.querySelector('input[value="fenixfardamentos.al@gmail.com"]').value}`, margin, leftY); leftY += 5;
 
             doc.setFontSize(10);
             doc.setFont('helvetica', 'bold');
@@ -434,7 +430,8 @@
                 startY: yPosition,
                 theme: 'grid',
                 headStyles: { fillColor: [255, 107, 53], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
-                columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 1: { halign: 'left' }, 2: { halign: 'center', cellWidth: 15 }, 3: { halign: 'right', cellWidth: 30 }, 4: { halign: 'right', cellWidth: 30 } }
+                columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 1: { halign: 'left' }, 2: { halign: 'center', cellWidth: 15 }, 3: { halign: 'right', cellWidth: 30 }, 4: { halign: 'right', cellWidth: 30 } },
+                didDrawPage: (data) => { yPosition = data.cursor.y; }
             });
             yPosition = doc.previousAutoTable.finalY;
 
@@ -521,8 +518,19 @@
         }
 
         function fecharModal() { document.getElementById('shareModal').style.display = 'none'; }
-        function baixarPDF() { if (pdfGerado) pdfGerado.save(`Orcamento_${dadosOrcamento.clienteNome.replace(/\s+/g, '_')}.pdf`); }
-        function baixarImagem() { /* ... Lógica de imagem ... */ }
+        
+        function baixarPDF() {
+            if (pdfGerado) {
+                pdfGerado.save(`Orcamento_${dadosOrcamento.clienteNome.replace(/\s+/g, '_')}.pdf`);
+            }
+        }
+        
+        function baixarImagem() {
+            if (!dadosOrcamento) return;
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            // ... (A lógica para criar a imagem continua aqui)
+        }
         
         // --- INICIALIZAÇÃO ---
         window.onload = function() {
