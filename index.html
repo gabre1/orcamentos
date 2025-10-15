@@ -167,7 +167,6 @@
             const select = document.getElementById('clienteExistente');
             const clienteId = select.value;
             const cliente = clientesCache.find(c => c.id == clienteId);
-
             document.getElementById('clienteNome').value = cliente ? cliente.nome : '';
             document.getElementById('clienteEmail').value = cliente ? cliente.email : '';
             const telefoneInput = document.getElementById('clienteTelefone');
@@ -181,20 +180,14 @@
         async function salvarCliente() {
             const nome = document.getElementById('clienteNome').value.trim();
             const cnpj_cpf = document.getElementById('clienteCnpjCpf').value.trim();
-            if (!nome) {
-                alert('O nome do cliente é obrigatório para salvar.');
-                return;
-            }
+            if (!nome) { alert('O nome do cliente é obrigatório para salvar.'); return; }
             const docLimpo = cnpj_cpf.replace(/\D/g, '');
             if (docLimpo.length > 0) {
                 if (docLimpo.length === 11 && !validarCPF(docLimpo)) { alert('CPF inválido.'); return; }
                 else if (docLimpo.length === 14 && !validarCNPJ(docLimpo)) { alert('CNPJ inválido.'); return; }
                 else if (docLimpo.length !== 11 && docLimpo.length !== 14) { alert('CPF/CNPJ com número de dígitos incorreto.'); return; }
             }
-            if (clientesCache.some(c => c.nome.toLowerCase() === nome.toLowerCase())) {
-                alert('Um cliente com este nome já existe.');
-                return;
-            }
+            if (clientesCache.some(c => c.nome.toLowerCase() === nome.toLowerCase())) { alert('Um cliente com este nome já existe.'); return; }
             const email = document.getElementById('clienteEmail').value.trim();
             const telefone = document.getElementById('clienteTelefone').value.trim();
             try {
@@ -241,11 +234,14 @@
         
         function formatarCampoMoeda(input) {
             let valor = input.value.replace(/\D/g, '');
-            if(valor === '') { input.value = ''; return; }
+            if (valor === '') {
+                input.value = '';
+                return;
+            }
             valor = (parseInt(valor, 10) / 100).toFixed(2) + '';
             valor = valor.replace('.', ',');
-            const regex = /(\d)(?=(\d{3})+(?!\d))/g;
-            input.value = valor.replace(regex, '$1.');
+            valor = valor.replace(/(\d)(?=(\d{3})+(?!\d),)/g, '$1.');
+            input.value = valor;
         }
 
         // --- FUNÇÕES DO GERADOR (ITENS, TOTAIS, PDF) ---
@@ -287,6 +283,7 @@
             const container = document.getElementById('itensContainer');
             if (itens.length === 0) {
                 container.innerHTML = `<div class="empty-state"><h3>Nenhum item adicionado</h3></div>`;
+                document.getElementById('totaisContainer').innerHTML = ''; // Limpa os totais também
             } else {
                  container.innerHTML = `
                     <table class="items-table">
@@ -303,28 +300,48 @@
                         </tbody>
                     </table>`;
             }
-            atualizarTotais();
+            // Chama a função para criar ou atualizar os totais
+            renderizarOuAtualizarTotais();
         }
 
-        function atualizarTotais() {
+        function renderizarOuAtualizarTotais() {
             const totaisContainer = document.getElementById('totaisContainer');
+            if (itens.length === 0) return;
+
+            // Se a seção de totais não existe, cria.
+            if (!document.getElementById('total-section-id')) {
+                 totaisContainer.innerHTML = `
+                    <div class="total-section" id="total-section-id">
+                        <div class="form-grid" style="margin-bottom: 20px; text-align: left;">
+                            <div class="form-group">
+                                <label for="descontoValor" style="color: white;">Desconto (R$)</label>
+                                <input type="text" id="descontoValor" placeholder="0,00" oninput="handleDescontoInput(this)">
+                            </div>
+                        </div>
+                        <p style="font-size: 1rem;">Subtotal: <span id="subtotal-valor"></span></p>
+                        <p style="font-size: 1rem; margin-bottom: 10px;">Desconto: <span id="desconto-valor-display"></span></p>
+                        <h3>Total Geral</h3>
+                        <p id="total-geral-valor"></p>
+                    </div>`;
+            }
+            // Apenas atualiza os valores
+            atualizarValoresTotais();
+        }
+
+        function handleDescontoInput(input) {
+            formatarCampoMoeda(input);
+            atualizarValoresTotais();
+        }
+        
+        function atualizarValoresTotais() {
+            if (itens.length === 0) return;
             const subtotal = itens.reduce((acc, item) => acc + item.valorTotal, 0);
-            const desconto = parseCurrency(document.getElementById('descontoValor')?.value);
+            const desconto = parseCurrency(document.getElementById('descontoValor').value);
             const totalGeral = subtotal - desconto;
             
-            totaisContainer.innerHTML = `
-                <div class="total-section">
-                    <div class="form-grid" style="margin-bottom: 20px; text-align: left;">
-                        <div class="form-group">
-                            <label for="descontoValor" style="color: white;">Desconto (R$)</label>
-                            <input type="text" id="descontoValor" placeholder="0,00" oninput="formatarCampoMoeda(this); atualizarTotais();" value="${document.getElementById('descontoValor')?.value || ''}">
-                        </div>
-                    </div>
-                    <p style="font-size: 1rem;">Subtotal: ${formatarMoeda(subtotal)}</p>
-                    <p style="font-size: 1rem; margin-bottom: 10px;">Desconto: - ${formatarMoeda(desconto)}</p>
-                    <h3>Total Geral</h3>
-                    <p>${formatarMoeda(totalGeral)}</p>
-                </div>`;
+            document.getElementById('subtotal-valor').textContent = formatarMoeda(subtotal);
+            document.getElementById('desconto-valor-display').textContent = `- ${formatarMoeda(desconto)}`;
+            document.getElementById('total-geral-valor').textContent = formatarMoeda(totalGeral);
         }
 
         function gerarPDF() {
@@ -529,7 +546,7 @@
             if (!dadosOrcamento) return;
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            // ... (A lógica para criar a imagem continua aqui)
+            // ... (Lógica para criar a imagem aqui)
         }
         
         // --- INICIALIZAÇÃO ---
