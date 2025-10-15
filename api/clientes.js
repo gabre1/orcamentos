@@ -44,3 +44,4 @@ export default async function handler(request, response) {
     return response.status(500).json({ error: 'Ocorreu um erro inesperado no servidor.' });
   }
 }
+// forçando building
