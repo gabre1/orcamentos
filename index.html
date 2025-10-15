@@ -360,11 +360,10 @@
             const logoImg = new Image();
             logoImg.crossOrigin = 'anonymous';
             logoImg.onload = function() {
-                const logoWidth = 60;
                 // --- INÍCIO DA CORREÇÃO ---
-                // Calcula a altura proporcionalmente à largura original da imagem
-                const aspectRatio = this.naturalHeight / this.naturalWidth;
-                const logoHeight = logoWidth * aspectRatio;
+                const logoWidth = 60; // Define a largura desejada
+                const aspectRatio = this.naturalHeight / this.naturalWidth; // Calcula a proporção da imagem original
+                const logoHeight = logoWidth * aspectRatio; // Calcula a altura proporcional
                 // --- FIM DA CORREÇÃO ---
                 
                 const logoX = (pageWidth - logoWidth) / 2;
