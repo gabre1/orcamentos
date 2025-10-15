@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Orçamentos</title>
+    <title>Gerador de Orçamentos</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <style>
@@ -281,6 +281,7 @@
             const container = document.getElementById('itensContainer');
             if (itens.length === 0) {
                 container.innerHTML = `<div class="empty-state"><h3>Nenhum item adicionado</h3></div>`;
+                document.getElementById('totaisContainer').innerHTML = '';
             } else {
                  container.innerHTML = `
                     <table class="items-table">
@@ -360,7 +361,7 @@
             const logoImg = new Image();
             logoImg.crossOrigin = 'anonymous';
             logoImg.onload = function() {
-                const logoWidth = 60, logoHeight = 20; // Dimensões ajustadas
+                const logoWidth = 60, logoHeight = 20;
                 const logoX = (pageWidth - logoWidth) / 2;
                 doc.addImage(this, 'PNG', logoX, yPosition, logoWidth, logoHeight);
                 yPosition += logoHeight + 5;
