@@ -1,11 +1,12 @@
 // --- VARIÁVEIS GLOBAIS ---
 let clientesCache = [];
+let itensOrcamento = [];
+let contadorItemId = 0;
 
-// --- FUNÇÕES DE FORMATAÇÃO AUTOMÁTICA ---
+// --- FUNÇÕES DE FORMATAÇÃO E VALIDAÇÃO ---
 
-// Formata o campo de telefone enquanto o usuário digita
 function formatarTelefone(input) {
-    let value = input.value.replace(/\D/g, ''); // Remove tudo que não é dígito
+    let value = input.value.replace(/\D/g, '');
     if (value.length > 10) {
         value = value.replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
     } else if (value.length > 2) {
@@ -16,14 +17,13 @@ function formatarTelefone(input) {
     input.value = value;
 }
 
-// Formata o campo de CPF/CNPJ enquanto o usuário digita
 function formatarCnpjCpf(input) {
     let valor = input.value.replace(/\D/g, '');
-    if (valor.length <= 11) { // Formata como CPF
+    if (valor.length <= 11) {
         valor = valor.replace(/(\d{3})(\d)/, '$1.$2');
         valor = valor.replace(/(\d{3})(\d)/, '$1.$2');
         valor = valor.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-    } else { // Formata como CNPJ
+    } else {
         valor = valor.replace(/^(\d{2})(\d)/, '$1.$2');
         valor = valor.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
         valor = valor.replace(/\.(\d{3})(\d)/, '.$1/$2');
@@ -32,8 +32,27 @@ function formatarCnpjCpf(input) {
     input.value = valor;
 }
 
-// --- FUNÇÕES DA APLICAÇÃO ---
+const isEmailValid = (email) => {
+  if (!email) return true;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
 
+// Converte um valor formatado (ex: "1.234,56") para um número (ex: 1234.56)
+function parseCurrency(value) {
+    if (!value) return 0;
+    return parseFloat(String(value).replace(/\./g, '').replace(',', '.')) || 0;
+}
+
+// Formata um número para o padrão monetário brasileiro (ex: "R$ 1.234,56")
+function formatarMoeda(valor) {
+    return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+
+// --- FUNÇÕES PRINCIPAIS DA APLICAÇÃO ---
+
+// ... (showApp, showLogin, checkLoginStatus - sem alterações) ...
 function showApp() {
     document.getElementById('login-container').classList.add('hidden');
     document.getElementById('app-container').classList.remove('hidden');
@@ -48,29 +67,25 @@ function showLogin() {
 }
 
 async function checkLoginStatus() {
-    console.log("Verificando status da sessão com a API...");
     try {
         const response = await fetch('/api/session-check');
         if (response.ok) {
             const data = await response.json();
             if (data.loggedIn) {
-                console.log("API confirmou: Sessão válida. Mostrando a aplicação.");
                 showApp();
             } else {
-                console.log("API confirmou: Sessão inválida. Mostrando tela de login.");
                 showLogin();
             }
         } else {
-            console.log("Falha na chamada da API de sessão. Mostrando tela de login.");
             showLogin();
         }
     } catch (error) {
-        console.error("Erro ao verificar a sessão:", error);
         showLogin();
     }
 }
 
 async function carregarClientes() {
+    // ... (sem alterações) ...
     const select = document.getElementById('clienteExistente');
     select.innerHTML = '<option value="">-- Carregando clientes... --</option>';
     try {
@@ -90,22 +105,19 @@ async function carregarClientes() {
 }
 
 function selecionarCliente() {
+    // ... (sem alterações) ...
     const select = document.getElementById('clienteExistente');
     const clienteId = select.value;
     const clienteSelecionado = clientesCache.find(c => c.id == clienteId);
-
     const nomeInput = document.getElementById('clienteNome');
     const cnpjCpfInput = document.getElementById('clienteCnpjCpf');
     const emailInput = document.getElementById('clienteEmail');
     const telefoneInput = document.getElementById('clienteTelefone');
-
     if (clienteSelecionado) {
         nomeInput.value = clienteSelecionado.nome || '';
         cnpjCpfInput.value = clienteSelecionado.cnpj_cpf || '';
         emailInput.value = clienteSelecionado.email || '';
         telefoneInput.value = clienteSelecionado.telefone || '';
-        
-        // Formatamos os campos que foram preenchidos
         formatarCnpjCpf(cnpjCpfInput);
         formatarTelefone(telefoneInput);
     } else {
@@ -118,31 +130,37 @@ function selecionarCliente() {
 
 async function salvarCliente() {
     const clienteNome = document.getElementById('clienteNome').value.trim();
+    const clienteEmail = document.getElementById('clienteEmail').value.trim();
+
+    // Validação de Nome e E-mail
     if (!clienteNome) {
         alert('O nome do cliente é obrigatório.');
+        return;
+    }
+    if (!isEmailValid(clienteEmail)) {
+        alert('O formato do e-mail é inválido. Por favor, corrija.');
         return;
     }
 
     const clienteData = {
         nome: clienteNome,
         cnpj_cpf: document.getElementById('clienteCnpjCpf').value.trim(),
-        email: document.getElementById('clienteEmail').value.trim(),
+        email: clienteEmail,
         telefone: document.getElementById('clienteTelefone').value.trim(),
     };
 
     try {
+        // ... (resto da função sem alterações) ...
         const response = await fetch('/api/clientes', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(clienteData),
         });
-
         if (response.ok) {
             alert(`Cliente "${clienteNome}" salvo com sucesso!`);
-            // Limpa o formulário e recarrega a lista de clientes para incluir o novo
-            document.getElementById('clienteExistente').value = ""; // Reseta o dropdown
-            selecionarCliente(); // Limpa os campos de input
-            carregarClientes();   // Recarrega a lista de clientes do banco
+            document.getElementById('clienteExistente').value = "";
+            selecionarCliente();
+            carregarClientes();
         } else {
             const errorData = await response.json();
             alert(`Erro ao salvar cliente: ${errorData.error || 'Erro desconhecido'}`);
@@ -153,11 +171,80 @@ async function salvarCliente() {
     }
 }
 
+// --- NOVAS FUNÇÕES: ORÇAMENTO ---
+
+function renderizarTabelaItens() {
+    const container = document.getElementById('itensContainer');
+    if (itensOrcamento.length === 0) {
+        container.innerHTML = `<div class="empty-state"><h3>Nenhum item adicionado</h3><p>Adicione itens ao orçamento.</p></div>`;
+    } else {
+        const tabelaHTML = `
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th>Descrição</th>
+                        <th>Qtd</th>
+                        <th>Valor Unit.</th>
+                        <th>Total</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${itensOrcamento.map(item => `
+                        <tr>
+                            <td>${item.descricao}</td>
+                            <td>${item.quantidade}</td>
+                            <td>${formatarMoeda(item.valorUnitario)}</td>
+                            <td>${formatarMoeda(item.valorTotal)}</td>
+                            <td><button class="btn btn-danger btn-remover-item" data-id="${item.id}">🗑️</button></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+        container.innerHTML = tabelaHTML;
+    }
+}
+
+function adicionarItem() {
+    const descricao = document.getElementById('itemDescricao').value.trim();
+    const quantidade = parseInt(document.getElementById('itemQuantidade').value);
+    const valorUnitario = parseCurrency(document.getElementById('itemValorUnitario').value);
+
+    if (!descricao || isNaN(quantidade) || quantidade <= 0 || isNaN(valorUnitario) || valorUnitario <= 0) {
+        alert('Por favor, preencha todos os campos do item com valores válidos.');
+        return;
+    }
+
+    const novoItem = {
+        id: ++contadorItemId,
+        descricao,
+        quantidade,
+        valorUnitario,
+        valorTotal: quantidade * valorUnitario
+    };
+
+    itensOrcamento.push(novoItem);
+    renderizarTabelaItens();
+
+    // Limpa os campos após adicionar
+    document.getElementById('itemDescricao').value = '';
+    document.getElementById('itemQuantidade').value = '1';
+    document.getElementById('itemValorUnitario').value = '';
+}
+
+function removerItem(itemId) {
+    itensOrcamento = itensOrcamento.filter(item => item.id !== itemId);
+    renderizarTabelaItens();
+}
+
+
 // --- INICIALIZAÇÃO E EVENTOS ---
 
 document.addEventListener('DOMContentLoaded', () => {
-    // --- LÓGICA DE LOGIN ---
+    // --- LÓGICA DE LOGIN (sem alterações) ---
     const loginForm = document.getElementById('login-form');
+    // ... (código de login) ...
     const errorMessage = document.getElementById('error-message');
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
@@ -189,13 +276,11 @@ document.addEventListener('DOMContentLoaded', () => {
         selectCliente.addEventListener('change', selecionarCliente);
     }
     
-    // CONECTANDO O BOTÃO SALVAR CLIENTE À SUA FUNÇÃO
     const btnSalvar = document.getElementById('btnSalvarCliente');
     if (btnSalvar) {
         btnSalvar.addEventListener('click', salvarCliente);
     }
 
-    // CONECTANDO OS CAMPOS ÀS FUNÇÕES DE FORMATAÇÃO
     const inputCnpjCpf = document.getElementById('clienteCnpjCpf');
     if (inputCnpjCpf) {
         inputCnpjCpf.addEventListener('input', (e) => formatarCnpjCpf(e.target));
@@ -206,6 +291,23 @@ document.addEventListener('DOMContentLoaded', () => {
         inputTelefone.addEventListener('input', (e) => formatarTelefone(e.target));
     }
 
-    // Inicia a verificação da sessão assim que a página carrega
+    // CONECTANDO O BOTÃO ADICIONAR ITEM E A TABELA
+    const btnAdicionarItem = document.getElementById('btnAdicionarItem');
+    if (btnAdicionarItem) {
+        btnAdicionarItem.addEventListener('click', adicionarItem);
+    }
+
+    const itensContainer = document.getElementById('itensContainer');
+    if (itensContainer) {
+        // Usamos delegação de eventos para capturar cliques nos botões de remover
+        itensContainer.addEventListener('click', (e) => {
+            if (e.target && e.target.classList.contains('btn-remover-item')) {
+                const itemId = parseInt(e.target.dataset.id, 10);
+                removerItem(itemId);
+            }
+        });
+    }
+
+    // Inicia a verificação da sessão
     checkLoginStatus();
 });
