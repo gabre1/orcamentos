@@ -1,45 +1,33 @@
+// Arquivo: /api/clientes.js
+
 import { createPool } from '@vercel/postgres';
 
-// Cria a conexão com o banco de dados lendo a variável de ambiente correta
-const pool = createPool({
+// Crie a conexão usando a variável de ambiente correta
+const dbPool = createPool({
   connectionString: process.env.CLIENTES_POSTGRES_URL,
 });
 
-export default async function handler(request, response) {
+export default async function handler(req, res) {
+  // Apenas requisições GET são permitidas para buscar dados
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
   try {
-    // Rota para SALVAR um novo cliente
-    if (request.method === "POST") {
-      const { nome, email, telefone, cnpj_cpf } = request.body;
-      if (!nome) {
-        return response.status(400).json({ error: 'O campo Nome é obrigatório.' });
-      }
+    console.log("Tentando buscar a lista de clientes do banco de dados...");
 
-      const { rows: maxCodeRows } = await pool.sql`SELECT MAX(codigo_cliente) as max_code FROM Clientes;`;
-      const novoCodigo = (maxCodeRows[0]?.max_code || 0) + 1;
+    // Execute a consulta SQL para buscar os clientes.
+    // ATENÇÃO: Verifique se o nome da sua tabela é "clientes" e as colunas são "id", "nome", etc.
+    const { rows } = await dbPool.query('SELECT id, nome, codigo_cliente FROM clientes ORDER BY nome ASC');
 
-      await pool.sql`
-        INSERT INTO Clientes (Nome, Email, Telefone, cnpj_cpf, codigo_cliente) 
-        VALUES (${nome}, ${email}, ${telefone}, ${cnpj_cpf}, ${novoCodigo});
-      `;
-      
-      return response.status(200).json({ message: 'Cliente salvo com sucesso!' });
+    console.log(`Sucesso! ${rows.length} clientes encontrados.`);
 
-    } 
-    // Rota para BUSCAR todos os clientes
-    else if (request.method === "GET") {
-      response.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-      response.setHeader('Pragma', 'no-cache');
-      response.setHeader('Expires', '0');
+    // Envie a lista de clientes de volta para o frontend como JSON
+    return res.status(200).json(rows);
 
-      const { rows } = await pool.sql`SELECT * FROM Clientes ORDER BY codigo_cliente;`;
-      return response.status(200).json(rows);
-    } 
-    else {
-      response.setHeader('Allow', ['GET', 'POST']);
-      return response.status(405).end(`Método ${request.method} não permitido`);
-    }
   } catch (error) {
-    console.error('Erro crítico no backend (clientes):', error);
-    return response.status(500).json({ error: 'Ocorreu um erro inesperado no servidor.', details: error.message });
+    // Se ocorrer um erro, registre no log e envie uma resposta de erro 500
+    console.error('Erro ao buscar clientes no banco de dados:', error);
+    return res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 }
