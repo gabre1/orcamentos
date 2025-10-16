@@ -1,4 +1,4 @@
-// Arquivo: /api/orcamentos.js (Versão 1.3.5 - Estável)
+// Arquivo: /api/orcamentos.js (Versão 1.3.6 - Estável)
 
 import { createPool } from '@vercel/postgres';
 
@@ -12,6 +12,13 @@ function handleError(res, error, context) {
 }
 
 export default async function handler(req, res) {
+  // --- INÍCIO DA CORREÇÃO DE CACHE ---
+  // Adiciona cabeçalhos para prevenir o cache em nível de servidor e navegador
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  // --- FIM DA CORREÇÃO DE CACHE ---
+
   const { method } = req;
 
   switch (method) {
