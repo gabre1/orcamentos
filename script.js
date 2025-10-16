@@ -46,7 +46,42 @@ function continuarGeracaoPDF(doc, pageWidth, margin, yPosition) { doc.setFontSiz
 function fecharModal() { document.getElementById('shareModal').style.display = 'none'; }
 function baixarPDF() { if (pdfGerado) { pdfGerado.save(`Orcamento_${dadosOrcamento.clienteNome.replace(/\s+/g, '_')}.pdf`); } }
 function encaminharWhatsApp() { const telefoneCliente = document.getElementById('clienteTelefone').value; if (!telefoneCliente) { mostrarNotificacao('O telefone do cliente está vazio.', 'erro'); return; } const numeroLimpo = '55' + telefoneCliente.replace(/\D/g, ''); const totalGeralText = document.getElementById('total-geral-valor').textContent; const mensagem = `Olá, ${dadosOrcamento.clienteNome}! Segue o seu orçamento no valor de ${totalGeralText}. Para mais detalhes, consulte o PDF.`; const url = `https://wa.me/${numeroLimpo}?text=${encodeURIComponent(mensagem)}`; window.open(url, '_blank'); }
-async function carregarPainelProducao() { mostrarNotificacao('Atualizando painel...', 'info'); const colunas = { aprovado: document.getElementById('coluna-aprovado'), 'em-producao': document.getElementById('coluna-em-producao'), concluido: document.getElementById('coluna-concluido'), }; Object.values(colunas).forEach(c => c.innerHTML = ''); try { const response = await fetch('/api/orcamentos?painel_producao=true', { cache: 'no-cache' }); if (!response.ok) throw new Error('Falha ao carregar dados de produção.'); const orcamentos = await response.json(); if(orcamentos.length === 0) { document.getElementById('coluna-aprovado').innerHTML = '<div class="empty-state">Nenhum pedido nos estágios de produção.</div>'; } orcamentos.forEach(o => { const statusKey = o.status.toLowerCase().replace(' ', '-'); if (colunas[statusKey]) { const card = document.createElement('div'); card.className = 'kanban-card'; let paymentStatusHTML = ''; const totalPago = parseFloat(o.total_pago); const valorTotal = parseFloat(o.valor_total); if (totalPago >= valorTotal) { paymentStatusHTML = '<span class="payment-status status-pago">Pago</span>'; } else if (totalPago > 0) { paymentStatusHTML = `<span class="payment-status status-parcial">Parcial (${formatarMoeda(totalPago)})</span>`; } else { paymentStatusHTML = '<span class="payment-status status-pendente">Pendente</span>'; } card.innerHTML = ` <h4>${o.codigo_orcamento}</h4> <p>${o.cliente_nome}</p> <p><strong>Total: ${formatarMoeda(valorTotal)}</strong> ${paymentStatusHTML}</p> <div class="kanban-card-footer"> <button class="btn btn-secondary btn-visualizar-kanban" data-id="${o.id}">Detalhes</button> ${o.status === 'Concluído' ? `<button class="btn btn-success btn-registrar-pagamento" data-id="${o.id}" data-total="${valorTotal}" data-pago="${totalPago}">Pagamento</button>` : ''} </div> `; colunas[statusKey].appendChild(card); } }); } catch (error) { mostrarNotificacao(error.message, 'erro'); } }
+
+async function carregarPainelProducao() {
+    mostrarNotificacao('Atualizando painel...', 'info');
+    const colunas = {
+        aprovado: document.getElementById('coluna-aprovado'),
+        'em-produção': document.getElementById('coluna-em-producao'),
+        concluído: document.getElementById('coluna-concluido'),
+    };
+    Object.values(colunas).forEach(c => c.innerHTML = ''); 
+    try {
+        const response = await fetch('/api/orcamentos?painel_producao=true', { cache: 'no-cache' });
+        if (!response.ok) throw new Error('Falha ao carregar dados de produção.');
+        const orcamentos = await response.json();
+        if(orcamentos.length === 0) {
+            document.getElementById('coluna-aprovado').innerHTML = '<div class="empty-state">Nenhum pedido nos estágios de produção.</div>';
+        }
+        orcamentos.forEach(o => {
+            const statusKey = o.status.toLowerCase().replace(' ', '-');
+            if (colunas[statusKey]) {
+                const card = document.createElement('div');
+                card.className = 'kanban-card';
+                let paymentStatusHTML = '';
+                const totalPago = parseFloat(o.total_pago);
+                const valorTotal = parseFloat(o.valor_total);
+                if (totalPago >= valorTotal) { paymentStatusHTML = '<span class="payment-status status-pago">Pago</span>'; }
+                else if (totalPago > 0) { paymentStatusHTML = `<span class="payment-status status-parcial">Parcial (${formatarMoeda(totalPago)})</span>`; }
+                else { paymentStatusHTML = '<span class="payment-status status-pendente">Pendente</span>'; }
+                card.innerHTML = ` <h4>${o.codigo_orcamento}</h4> <p>${o.cliente_nome}</p> <p><strong>Total: ${formatarMoeda(valorTotal)}</strong> ${paymentStatusHTML}</p> <div class="kanban-card-footer"> <button class="btn btn-secondary btn-visualizar-kanban" data-id="${o.id}">Detalhes</button> ${o.status === 'Concluído' ? `<button class="btn btn-success btn-registrar-pagamento" data-id="${o.id}" data-total="${valorTotal}" data-pago="${totalPago}">Pagamento</button>` : ''} </div> `;
+                colunas[statusKey].appendChild(card);
+            }
+        });
+    } catch (error) {
+        mostrarNotificacao(error.message, 'erro');
+    }
+}
+
 async function salvarPagamento() { const valorPago = parseCurrency(document.getElementById('inputValorPago').value); if (!valorPago || valorPago <= 0) { mostrarNotificacao('Insira um valor de pagamento válido.', 'erro'); return; } const dadosPagamento = { orcamento_id: orcamentoParaAcaoId, valor_pago: valorPago, metodo_pagamento: document.getElementById('selectMetodoPagamento').value, observacoes: document.getElementById('inputObsPagamento').value, }; try { const response = await fetch('/api/pagamentos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dadosPagamento), }); if (response.ok) { mostrarNotificacao('Pagamento registrado com sucesso!', 'sucesso'); document.getElementById('pagamentoModal').style.display = 'none'; carregarPainelProducao(); } else { throw new Error('Falha ao registrar o pagamento.'); } } catch (error) { mostrarNotificacao(error.message, 'erro'); } }
 
 // --- INICIALIZAÇÃO E EVENTOS ---
