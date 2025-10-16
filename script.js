@@ -1,22 +1,59 @@
-// Adicionamos uma função dedicada para mostrar a aplicação
+// --- FUNÇÕES DA APLICAÇÃO ---
+
+// Função para exibir a aplicação principal
 function showApp() {
     document.getElementById('login-container').classList.add('hidden');
     document.getElementById('app-container').classList.remove('hidden');
     document.body.style.alignItems = 'flex-start';
-    // Se você tiver funções que precisam carregar dados iniciais, chame-as aqui
-    // Por exemplo: carregarClientes();
+    
+    // CORREÇÃO PRINCIPAL: Chamamos a função para carregar os clientes aqui!
+    carregarClientes();
 }
 
-// A função original para verificar o status quando a página carrega
+// Função para verificar o status do login quando a página carrega
 function checkLoginStatus() {
     if (document.cookie.includes('app_session=valid')) {
-        showApp(); // Reutilizamos a nova função
+        showApp();
     } else {
         document.getElementById('login-container').classList.remove('hidden');
         document.getElementById('app-container').classList.add('hidden');
         document.body.style.alignItems = 'center';
     }
 }
+
+// NOVA FUNÇÃO: Busca os clientes na API e preenche a lista
+async function carregarClientes() {
+    const select = document.getElementById('clienteExistente');
+    // Mostra uma mensagem de "Carregando..." enquanto busca os dados
+    select.innerHTML = '<option value="">-- Carregando clientes... --</option>';
+
+    try {
+        const response = await fetch('/api/clientes');
+
+        if (!response.ok) {
+            // Se a resposta da API não for bem-sucedida (ex: erro 500)
+            throw new Error('Falha ao buscar os clientes.');
+        }
+
+        const clientes = await response.json();
+
+        // Limpa o select e adiciona a opção padrão
+        select.innerHTML = '<option value="">-- Novo Cliente --</option>';
+
+        // Preenche o select com os clientes retornados pela API
+        clientes.forEach(cliente => {
+            const option = new Option(`${cliente.codigo_cliente} - ${cliente.nome}`, cliente.id);
+            select.appendChild(option);
+        });
+
+    } catch (error) {
+        console.error("Erro ao carregar clientes:", error);
+        select.innerHTML = '<option value="">-- Erro ao carregar --</option>';
+    }
+}
+
+
+// --- INICIALIZAÇÃO E EVENTOS ---
 
 document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('login-form');
@@ -36,11 +73,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({ username, password })
                 });
 
-                // --- ESTA É A CORREÇÃO PRINCIPAL ---
                 if (response.ok) {
-                    // Se a resposta for OK (200), chame a função para mostrar a app diretamente.
-                    // Não precisamos checar o cookie aqui, pois o sucesso da requisição já é a confirmação.
-                    showApp();
+                    showApp(); // A chamada para carregar clientes está dentro desta função
                 } else {
                     const data = await response.json();
                     errorMessage.textContent = data.error || 'Credenciais inválidas.';
@@ -51,10 +85,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // O resto do seu script de gerador de orçamentos (funções de cliente, itens, etc.)
-    // viria aqui...
+    // O resto do seu script do gerador de orçamentos (funções para adicionar itens, etc.)
+    // pode vir aqui.
 
-    // --- INICIALIZAÇÃO ---
-    // Verificamos o status do login assim que a página é carregada
+    // Verifica o status do login assim que a página é carregada
     checkLoginStatus();
-});w
+});
