@@ -289,3 +289,22 @@ body {
     85% { opacity: 1; transform: translateX(0); }
     100% { opacity: 0; transform: translateX(100%); }
 }
+/* --- 7. ESTILOS DE NAVEGAÇÃO E PAINEL KANBAN --- */
+.app-nav { display: flex; justify-content: center; gap: 10px; margin-top: 20px; border-bottom: 1px solid var(--cor-borda); padding-bottom: 15px; }
+.nav-button { background: transparent; border: none; padding: 10px 20px; font-size: 1rem; font-weight: 600; font-family: 'Poppins', sans-serif; color: var(--cor-texto-claro); cursor: pointer; border-radius: 8px; transition: all 0.3s ease; }
+.nav-button.active, .nav-button:hover { background-color: var(--cor-secundaria); color: var(--cor-primaria); }
+.kanban-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+#kanban-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+.kanban-column-title { padding: 10px; border-radius: 8px; color: var(--cor-branco); text-align: center; font-weight: 600; margin-bottom: 15px; text-transform: uppercase; }
+.kanban-column-title.aprovado { background-color: var(--cor-primaria); }
+.kanban-column-title.em-producao { background-color: #11cdef; } /* Azul Info */
+.kanban-column-title.concluido { background-color: #2dce89; } /* Verde Sucesso */
+.kanban-cards { display: flex; flex-direction: column; gap: 15px; min-height: 300px; }
+.kanban-card { background: var(--cor-branco); border: 1px solid var(--cor-borda); border-radius: var(--raio-borda); padding: 15px; box-shadow: var(--sombra-padrao); }
+.kanban-card h4 { font-size: 1.1rem; color: var(--cor-texto); margin-bottom: 5px; }
+.kanban-card p { font-size: 0.9rem; color: var(--cor-texto-claro); margin-bottom: 15px; }
+.kanban-card-footer { display: flex; flex-wrap: wrap; gap: 10px; }
+.payment-status { font-size: 0.8rem; font-weight: 600; padding: 5px 8px; border-radius: 6px; }
+.status-pago { background: #e9f9f2; color: #2dce89; }
+.status-parcial { background: #fff3e6; color: var(--cor-primaria); }
+.status-pendente { background: #fdecea; color: #f5365c; }
