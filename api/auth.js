@@ -12,14 +12,15 @@ export default function handler(req, res) {
     const correctPass = process.env.LOGIN_PASS;
 
     if (username === correctUser && password === correctPass) {
+      
       // Construindo a string do cookie com todos os atributos recomendados
       const cookieString = [
         'app_session=valid',
-        'HttpOnly',        // Essencial para segurança
-        'Max-Age=3600',    // Cookie dura 1 hora (em segundos)
-        'Path=/',          // ESTA É A PARTE CRÍTICA PARA A SESSÃO PERSISTIR
-        'SameSite=Strict', // Proteção contra ataques CSRF
-        'Secure'           // Garante envio apenas em HTTPS (padrão Vercel)
+        'HttpOnly',        // Impede que o cookie seja acessado por JavaScript (essencial para segurança)
+        'Max-Age=3600',    // Define a duração do cookie para 1 hora
+        'Path=/',          // ESTA É A CORREÇÃO MAIS IMPORTANTE: Torna o cookie acessível em todo o site
+        'SameSite=Strict', // Aumenta a proteção contra ataques CSRF
+        'Secure'           // Garante que o cookie só seja enviado em conexões HTTPS (padrão da Vercel)
       ].join('; ');
       
       res.setHeader('Set-Cookie', cookieString);
