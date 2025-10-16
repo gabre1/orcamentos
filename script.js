@@ -1,4 +1,4 @@
-// Arquivo: script.js (Versão 1.3.5 - Estável)
+// Arquivo: script.js (Versão 1.3.6 - Estável)
 
 // --- VARIÁVEIS GLOBAIS ---
 let clientesCache = [];
