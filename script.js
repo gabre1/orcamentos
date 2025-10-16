@@ -95,7 +95,7 @@ async function carregarClientes() {
         clientesCache = clientes;
         select.innerHTML = '<option value="">-- Novo Cliente --</option>';
         clientes.forEach(cliente => {
-            const option = new Option(`${cliente.codigo_cliente} - ${cliente.nome}`, cliente.id);
+            const option = new Option(`#${cliente.id} - ${cliente.nome}`, cliente.id);
             select.appendChild(option);
         });
     } catch (error) {
