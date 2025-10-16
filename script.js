@@ -7,13 +7,9 @@ let contadorItemId = 0;
 
 function formatarTelefone(input) {
     let value = input.value.replace(/\D/g, '');
-    if (value.length > 10) {
-        value = value.replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
-    } else if (value.length > 2) {
-        value = value.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3');
-    } else if (value.length > 0) {
-        value = `(${value}`;
-    }
+    if (value.length > 10) { value = value.replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3'); } 
+    else if (value.length > 2) { value = value.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3'); } 
+    else if (value.length > 0) { value = `(${value}`; }
     input.value = value;
 }
 
@@ -38,13 +34,21 @@ const isEmailValid = (email) => {
   return emailRegex.test(email);
 };
 
-// Converte um valor formatado (ex: "1.234,56") para um número (ex: 1234.56)
+// Formata um campo de input para o padrão de moeda (BRL)
+function formatarCampoMoeda(input) {
+    let valor = input.value.replace(/\D/g, '');
+    if (valor === '') { input.value = ''; return; }
+    valor = (parseInt(valor, 10) / 100).toFixed(2) + '';
+    valor = valor.replace('.', ',');
+    valor = valor.replace(/(\d)(?=(\d{3})+(?!\d),)/g, '$1.');
+    input.value = valor;
+}
+
 function parseCurrency(value) {
     if (!value) return 0;
     return parseFloat(String(value).replace(/\./g, '').replace(',', '.')) || 0;
 }
 
-// Formata um número para o padrão monetário brasileiro (ex: "R$ 1.234,56")
 function formatarMoeda(valor) {
     return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -53,39 +57,11 @@ function formatarMoeda(valor) {
 // --- FUNÇÕES PRINCIPAIS DA APLICAÇÃO ---
 
 // ... (showApp, showLogin, checkLoginStatus - sem alterações) ...
-function showApp() {
-    document.getElementById('login-container').classList.add('hidden');
-    document.getElementById('app-container').classList.remove('hidden');
-    document.body.style.alignItems = 'flex-start';
-    carregarClientes();
-}
-
-function showLogin() {
-    document.getElementById('login-container').classList.remove('hidden');
-    document.getElementById('app-container').classList.add('hidden');
-    document.body.style.alignItems = 'center';
-}
-
-async function checkLoginStatus() {
-    try {
-        const response = await fetch('/api/session-check');
-        if (response.ok) {
-            const data = await response.json();
-            if (data.loggedIn) {
-                showApp();
-            } else {
-                showLogin();
-            }
-        } else {
-            showLogin();
-        }
-    } catch (error) {
-        showLogin();
-    }
-}
+function showApp() { document.getElementById('login-container').classList.add('hidden'); document.getElementById('app-container').classList.remove('hidden'); document.body.style.alignItems = 'flex-start'; carregarClientes(); }
+function showLogin() { document.getElementById('login-container').classList.remove('hidden'); document.getElementById('app-container').classList.add('hidden'); document.body.style.alignItems = 'center'; }
+async function checkLoginStatus() { try { const response = await fetch('/api/session-check'); if (response.ok) { const data = await response.json(); if (data.loggedIn) { showApp(); } else { showLogin(); } } else { showLogin(); } } catch (error) { showLogin(); } }
 
 async function carregarClientes() {
-    // ... (sem alterações) ...
     const select = document.getElementById('clienteExistente');
     select.innerHTML = '<option value="">-- Carregando clientes... --</option>';
     try {
@@ -129,33 +105,14 @@ function selecionarCliente() {
 }
 
 async function salvarCliente() {
+    // ... (sem alterações) ...
     const clienteNome = document.getElementById('clienteNome').value.trim();
     const clienteEmail = document.getElementById('clienteEmail').value.trim();
-
-    // Validação de Nome e E-mail
-    if (!clienteNome) {
-        alert('O nome do cliente é obrigatório.');
-        return;
-    }
-    if (!isEmailValid(clienteEmail)) {
-        alert('O formato do e-mail é inválido. Por favor, corrija.');
-        return;
-    }
-
-    const clienteData = {
-        nome: clienteNome,
-        cnpj_cpf: document.getElementById('clienteCnpjCpf').value.trim(),
-        email: clienteEmail,
-        telefone: document.getElementById('clienteTelefone').value.trim(),
-    };
-
+    if (!clienteNome) { alert('O nome do cliente é obrigatório.'); return; }
+    if (!isEmailValid(clienteEmail)) { alert('O formato do e-mail é inválido. Por favor, corrija.'); return; }
+    const clienteData = { nome: clienteNome, cnpj_cpf: document.getElementById('clienteCnpjCpf').value.trim(), email: clienteEmail, telefone: document.getElementById('clienteTelefone').value.trim(), };
     try {
-        // ... (resto da função sem alterações) ...
-        const response = await fetch('/api/clientes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(clienteData),
-        });
+        const response = await fetch('/api/clientes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(clienteData), });
         if (response.ok) {
             alert(`Cliente "${clienteNome}" salvo com sucesso!`);
             document.getElementById('clienteExistente').value = "";
@@ -165,13 +122,10 @@ async function salvarCliente() {
             const errorData = await response.json();
             alert(`Erro ao salvar cliente: ${errorData.error || 'Erro desconhecido'}`);
         }
-    } catch (error) {
-        console.error('Erro de conexão ao salvar cliente:', error);
-        alert('Erro de conexão. Tente novamente.');
-    }
+    } catch (error) { console.error('Erro de conexão ao salvar cliente:', error); alert('Erro de conexão. Tente novamente.'); }
 }
 
-// --- NOVAS FUNÇÕES: ORÇAMENTO ---
+// --- FUNÇÕES DE ORÇAMENTO (ATUALIZADAS) ---
 
 function renderizarTabelaItens() {
     const container = document.getElementById('itensContainer');
@@ -180,15 +134,7 @@ function renderizarTabelaItens() {
     } else {
         const tabelaHTML = `
             <table class="items-table">
-                <thead>
-                    <tr>
-                        <th>Descrição</th>
-                        <th>Qtd</th>
-                        <th>Valor Unit.</th>
-                        <th>Total</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>Descrição</th><th>Qtd</th><th>Valor Unit.</th><th>Total</th><th>Ações</th></tr></thead>
                 <tbody>
                     ${itensOrcamento.map(item => `
                         <tr>
@@ -204,30 +150,80 @@ function renderizarTabelaItens() {
         `;
         container.innerHTML = tabelaHTML;
     }
+    // Sempre que a tabela muda, atualizamos os totais
+    renderizarOuAtualizarTotais(); 
+}
+
+// NOVA FUNÇÃO: Renderiza ou atualiza a seção de totais
+function renderizarOuAtualizarTotais() {
+    const totaisContainer = document.getElementById('totaisContainer');
+    if (itensOrcamento.length === 0) {
+        totaisContainer.innerHTML = '';
+        return;
+    }
+    // Se a seção de totais ainda não existe, cria o HTML dela
+    if (!document.getElementById('total-section-id')) {
+        totaisContainer.innerHTML = `
+            <div class="total-section" id="total-section-id">
+                <div class="form-grid" style="grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 20px; text-align: left;">
+                    <div class="form-group">
+                        <label for="descontoValor" style="color: white;">Desconto</label>
+                        <input type="text" id="descontoValor" placeholder="0" style="padding: 12px 15px; border-radius: 10px; border: none; font-size: 1rem;">
+                    </div>
+                    <div class="form-group">
+                        <label for="descontoTipo" style="color: white;">Tipo</label>
+                        <select id="descontoTipo" style="padding: 12px 15px; border-radius: 10px; border: none; font-size: 1rem;">
+                            <option value="dinheiro">R$</option>
+                            <option value="porcentagem">%</option>
+                        </select>
+                    </div>
+                </div>
+                <p style="font-size: 1rem; font-weight: 400; text-align: right;">Subtotal: <span id="subtotal-valor"></span></p>
+                <p style="font-size: 1rem; font-weight: 400; text-align: right; margin-bottom: 10px;">Desconto: <span id="desconto-valor-display"></span></p>
+                <h3 style="text-align: right;">Total Geral</h3>
+                <p id="total-geral-valor" style="text-align: right;"></p>
+            </div>`;
+        // Adiciona os "escutadores" de evento aos novos campos
+        document.getElementById('descontoValor').addEventListener('input', atualizarTotais);
+        document.getElementById('descontoTipo').addEventListener('change', atualizarTotais);
+    }
+    // Chama a função que faz os cálculos
+    atualizarTotais();
+}
+
+// NOVA FUNÇÃO: Calcula e exibe os totais
+function atualizarTotais() {
+    if (itensOrcamento.length === 0) return;
+
+    const subtotal = itensOrcamento.reduce((acc, item) => acc + item.valorTotal, 0);
+
+    const descontoValorInput = document.getElementById('descontoValor').value;
+    const descontoTipo = document.getElementById('descontoTipo').value;
+    let descontoCalculado = 0;
+
+    if (descontoTipo === 'dinheiro') {
+        descontoCalculado = parseCurrency(descontoValorInput);
+    } else { // porcentagem
+        const porcentagem = parseFloat(descontoValorInput) || 0;
+        descontoCalculado = subtotal * (porcentagem / 100);
+    }
+
+    const totalGeral = subtotal - descontoCalculado;
+
+    // Atualiza os valores na tela
+    document.getElementById('subtotal-valor').textContent = formatarMoeda(subtotal);
+    document.getElementById('desconto-valor-display').textContent = `- ${formatarMoeda(descontoCalculado)}`;
+    document.getElementById('total-geral-valor').textContent = formatarMoeda(totalGeral);
 }
 
 function adicionarItem() {
     const descricao = document.getElementById('itemDescricao').value.trim();
     const quantidade = parseInt(document.getElementById('itemQuantidade').value);
     const valorUnitario = parseCurrency(document.getElementById('itemValorUnitario').value);
-
-    if (!descricao || isNaN(quantidade) || quantidade <= 0 || isNaN(valorUnitario) || valorUnitario <= 0) {
-        alert('Por favor, preencha todos os campos do item com valores válidos.');
-        return;
-    }
-
-    const novoItem = {
-        id: ++contadorItemId,
-        descricao,
-        quantidade,
-        valorUnitario,
-        valorTotal: quantidade * valorUnitario
-    };
-
+    if (!descricao || isNaN(quantidade) || quantidade <= 0 || isNaN(valorUnitario) || valorUnitario <= 0) { alert('Por favor, preencha todos os campos do item com valores válidos.'); return; }
+    const novoItem = { id: ++contadorItemId, descricao, quantidade, valorUnitario, valorTotal: quantidade * valorUnitario };
     itensOrcamento.push(novoItem);
     renderizarTabelaItens();
-
-    // Limpa os campos após adicionar
     document.getElementById('itemDescricao').value = '';
     document.getElementById('itemQuantidade').value = '1';
     document.getElementById('itemValorUnitario').value = '';
@@ -237,7 +233,6 @@ function removerItem(itemId) {
     itensOrcamento = itensOrcamento.filter(item => item.id !== itemId);
     renderizarTabelaItens();
 }
-
 
 // --- INICIALIZAÇÃO E EVENTOS ---
 
@@ -253,53 +248,36 @@ document.addEventListener('DOMContentLoaded', () => {
             const password = document.getElementById('password-login').value;
             errorMessage.textContent = '';
             try {
-                const response = await fetch('/api/auth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                if (response.ok) {
-                    showApp();
-                } else {
-                    const data = await response.json();
-                    errorMessage.textContent = data.error || 'Credenciais inválidas.';
-                }
-            } catch (error) {
-                errorMessage.textContent = 'Erro de conexão. Tente novamente.';
-            }
+                const response = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+                if (response.ok) { showApp(); } else { const data = await response.json(); errorMessage.textContent = data.error || 'Credenciais inválidas.'; }
+            } catch (error) { errorMessage.textContent = 'Erro de conexão. Tente novamente.'; }
         });
     }
 
     // --- CONECTANDO EVENTOS AOS ELEMENTOS ---
     const selectCliente = document.getElementById('clienteExistente');
-    if (selectCliente) {
-        selectCliente.addEventListener('change', selecionarCliente);
-    }
+    if (selectCliente) { selectCliente.addEventListener('change', selecionarCliente); }
     
     const btnSalvar = document.getElementById('btnSalvarCliente');
-    if (btnSalvar) {
-        btnSalvar.addEventListener('click', salvarCliente);
-    }
+    if (btnSalvar) { btnSalvar.addEventListener('click', salvarCliente); }
 
     const inputCnpjCpf = document.getElementById('clienteCnpjCpf');
-    if (inputCnpjCpf) {
-        inputCnpjCpf.addEventListener('input', (e) => formatarCnpjCpf(e.target));
-    }
+    if (inputCnpjCpf) { inputCnpjCpf.addEventListener('input', (e) => formatarCnpjCpf(e.target)); }
     
     const inputTelefone = document.getElementById('clienteTelefone');
-    if (inputTelefone) {
-        inputTelefone.addEventListener('input', (e) => formatarTelefone(e.target));
+    if (inputTelefone) { inputTelefone.addEventListener('input', (e) => formatarTelefone(e.target)); }
+
+    // CONECTANDO O CAMPO DE VALOR UNITÁRIO À FORMATAÇÃO DE MOEDA
+    const inputValorUnitario = document.getElementById('itemValorUnitario');
+    if (inputValorUnitario) {
+        inputValorUnitario.addEventListener('input', (e) => formatarCampoMoeda(e.target));
     }
 
-    // CONECTANDO O BOTÃO ADICIONAR ITEM E A TABELA
     const btnAdicionarItem = document.getElementById('btnAdicionarItem');
-    if (btnAdicionarItem) {
-        btnAdicionarItem.addEventListener('click', adicionarItem);
-    }
+    if (btnAdicionarItem) { btnAdicionarItem.addEventListener('click', adicionarItem); }
 
     const itensContainer = document.getElementById('itensContainer');
     if (itensContainer) {
-        // Usamos delegação de eventos para capturar cliques nos botões de remover
         itensContainer.addEventListener('click', (e) => {
             if (e.target && e.target.classList.contains('btn-remover-item')) {
                 const itemId = parseInt(e.target.dataset.id, 10);
@@ -308,6 +286,5 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Inicia a verificação da sessão
     checkLoginStatus();
 });
