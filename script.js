@@ -13,9 +13,16 @@ function showApp() {
 }
 
 function checkLoginStatus() {
+    // --- ALTERAÇÃO AQUI: Adicionando logs de depuração ---
+    // Esta linha irá imprimir no console do navegador todos os cookies que ele conhece.
+    // Isso nos ajudará a ver se o cookie de sessão está realmente ausente ou mal formatado.
+    console.log("Verificando status do login. Cookies atuais:", document.cookie);
+
     if (document.cookie.includes('app_session=valid')) {
+        console.log("Cookie de sessão encontrado. Mostrando a aplicação.");
         showApp();
     } else {
+        console.log("Cookie de sessão não encontrado. Mostrando tela de login.");
         document.getElementById('login-container').classList.remove('hidden');
         document.getElementById('app-container').classList.add('hidden');
         document.body.style.alignItems = 'center';
@@ -33,7 +40,6 @@ async function carregarClientes() {
         }
         const clientes = await response.json();
 
-        // --- ALTERAÇÃO AQUI ---
         // Guardamos os dados dos clientes na variável global para uso futuro
         clientesCache = clientes;
 
@@ -49,7 +55,6 @@ async function carregarClientes() {
     }
 }
 
-// --- NOVA FUNÇÃO ---
 // Esta função é chamada sempre que um cliente é selecionado no dropdown
 function selecionarCliente() {
     const select = document.getElementById('clienteExistente');
@@ -93,7 +98,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({ username, password })
                 });
                 if (response.ok) {
-                    showApp();
+                    // Espera um instante para dar tempo do navegador processar e salvar o cookie
+                    setTimeout(() => {
+                        showApp();
+                    }, 100);
                 } else {
                     const data = await response.json();
                     errorMessage.textContent = data.error || 'Credenciais inválidas.';
@@ -104,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- ALTERAÇÃO AQUI: ADICIONANDO O "ESCUTADOR DE EVENTOS" ---
+    // --- ADICIONANDO O "ESCUTADOR DE EVENTOS" ---
     const selectCliente = document.getElementById('clienteExistente');
     if (selectCliente) {
         // Diz ao JavaScript para executar a função 'selecionarCliente' toda vez que o valor do dropdown mudar
