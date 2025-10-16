@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     // ... (nenhuma alteração aqui)
     try {
-      const { rows } = await dbPool.query('SELECT id, nome, codigo_cliente, cnpj_cpf, email, telefone FROM clientes ORDER BY nome ASC');
+      const { rows } = await dbPool.query('SELECT id, nome, cnpj_cpf, email, telefone FROM clientes ORDER BY nome ASC');
       return res.status(200).json(rows);
     } catch (error) {
       console.error('Erro ao buscar clientes:', error);
@@ -54,3 +54,4 @@ export default async function handler(req, res) {
 
   return res.status(405).json({ error: 'Method Not Allowed' });
 }
+
