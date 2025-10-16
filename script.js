@@ -1,16 +1,17 @@
+// --- VARIÁVEIS GLOBAIS ---
+// Vamos usar esta variável para guardar os dados dos clientes e acessá-los depois
+let clientesCache = [];
+
+
 // --- FUNÇÕES DA APLICAÇÃO ---
 
-// Função para exibir a aplicação principal
 function showApp() {
     document.getElementById('login-container').classList.add('hidden');
     document.getElementById('app-container').classList.remove('hidden');
     document.body.style.alignItems = 'flex-start';
-    
-    // CORREÇÃO PRINCIPAL: Chamamos a função para carregar os clientes aqui!
     carregarClientes();
 }
 
-// Função para verificar o status do login quando a página carrega
 function checkLoginStatus() {
     if (document.cookie.includes('app_session=valid')) {
         showApp();
@@ -21,26 +22,22 @@ function checkLoginStatus() {
     }
 }
 
-// NOVA FUNÇÃO: Busca os clientes na API e preenche a lista
 async function carregarClientes() {
     const select = document.getElementById('clienteExistente');
-    // Mostra uma mensagem de "Carregando..." enquanto busca os dados
     select.innerHTML = '<option value="">-- Carregando clientes... --</option>';
 
     try {
         const response = await fetch('/api/clientes');
-
         if (!response.ok) {
-            // Se a resposta da API não for bem-sucedida (ex: erro 500)
             throw new Error('Falha ao buscar os clientes.');
         }
-
         const clientes = await response.json();
 
-        // Limpa o select e adiciona a opção padrão
-        select.innerHTML = '<option value="">-- Novo Cliente --</option>';
+        // --- ALTERAÇÃO AQUI ---
+        // Guardamos os dados dos clientes na variável global para uso futuro
+        clientesCache = clientes;
 
-        // Preenche o select com os clientes retornados pela API
+        select.innerHTML = '<option value="">-- Novo Cliente --</option>';
         clientes.forEach(cliente => {
             const option = new Option(`${cliente.codigo_cliente} - ${cliente.nome}`, cliente.id);
             select.appendChild(option);
@@ -52,29 +49,51 @@ async function carregarClientes() {
     }
 }
 
+// --- NOVA FUNÇÃO ---
+// Esta função é chamada sempre que um cliente é selecionado no dropdown
+function selecionarCliente() {
+    const select = document.getElementById('clienteExistente');
+    const clienteId = select.value; // Pega o ID do cliente selecionado (ex: "3")
+
+    // Procura no nosso cache o objeto completo do cliente com base no ID
+    const clienteSelecionado = clientesCache.find(c => c.id == clienteId);
+
+    if (clienteSelecionado) {
+        // Se um cliente foi encontrado, preenche os campos do formulário
+        document.getElementById('clienteNome').value = clienteSelecionado.nome || '';
+        document.getElementById('clienteCnpjCpf').value = clienteSelecionado.cnpj_cpf || '';
+        document.getElementById('clienteEmail').value = clienteSelecionado.email || '';
+        document.getElementById('clienteTelefone').value = clienteSelecionado.telefone || '';
+    } else {
+        // Se o usuário selecionou "-- Novo Cliente --", limpa os campos
+        document.getElementById('clienteNome').value = '';
+        document.getElementById('clienteCnpjCpf').value = '';
+        document.getElementById('clienteEmail').value = '';
+        document.getElementById('clienteTelefone').value = '';
+    }
+}
+
 
 // --- INICIALIZAÇÃO E EVENTOS ---
 
 document.addEventListener('DOMContentLoaded', () => {
+    // --- LÓGICA DE LOGIN (sem alterações) ---
     const loginForm = document.getElementById('login-form');
     const errorMessage = document.getElementById('error-message');
-
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const username = document.getElementById('username').value;
             const password = document.getElementById('password-login').value;
             errorMessage.textContent = '';
-
             try {
                 const response = await fetch('/api/auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
                 });
-
                 if (response.ok) {
-                    showApp(); // A chamada para carregar clientes está dentro desta função
+                    showApp();
                 } else {
                     const data = await response.json();
                     errorMessage.textContent = data.error || 'Credenciais inválidas.';
@@ -85,6 +104,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- ALTERAÇÃO AQUI: ADICIONANDO O "ESCUTADOR DE EVENTOS" ---
+    const selectCliente = document.getElementById('clienteExistente');
+    if (selectCliente) {
+        // Diz ao JavaScript para executar a função 'selecionarCliente' toda vez que o valor do dropdown mudar
+        selectCliente.addEventListener('change', selecionarCliente);
+    }
+    
     // O resto do seu script do gerador de orçamentos (funções para adicionar itens, etc.)
     // pode vir aqui.
 
