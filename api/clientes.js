@@ -12,8 +12,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ATENÇÃO: Confirme se o nome da sua tabela é "clientes" e se as colunas existem.
-    const { rows } = await dbPool.query('SELECT id, nome, codigo_cliente FROM clientes ORDER BY nome ASC');
+    // --- CORREÇÃO APLICADA AQUI ---
+    // Adicionamos as colunas que estavam faltando: cnpj_cpf, email, telefone
+    const { rows } = await dbPool.query(
+      'SELECT id, nome, codigo_cliente, cnpj_cpf, email, telefone FROM clientes ORDER BY nome ASC'
+    );
+    
     return res.status(200).json(rows);
 
   } catch (error) {
