@@ -5,8 +5,8 @@ let clientesCache = [];
 let itensOrcamento = [];
 let contadorItemId = 0;
 let clienteSelecionadoId = null;
-let orcamentoAtualId = null; // ID do orçamento ATUAL (em edição)
-// Removidas as variáveis pdfGerado e dadosOrcamento
+let orcamentoAtualId = null;
+let orcamentoParaAcaoId = null;
 
 // --- FUNÇÃO DE NOTIFICAÇÃO ---
 function mostrarNotificacao(mensagem, tipo = 'sucesso') { const container = document.getElementById('notification-container'); if (!container) return; const toast = document.createElement('div'); toast.className = `toast ${tipo}`; toast.textContent = mensagem; container.appendChild(toast); setTimeout(() => { toast.remove(); }, 4000); }
@@ -34,114 +34,45 @@ function renderizarOuAtualizarTotais() { const totaisContainer = document.getEle
 function atualizarTotais() { if (itensOrcamento.length === 0 || !document.getElementById('total-section-id')) return; const subtotal = itensOrcamento.reduce((acc, item) => acc + item.valorTotal, 0); const descontoValorInput = document.getElementById('descontoValor').value; const descontoTipo = document.getElementById('descontoTipo').value; let descontoCalculado = 0; if (descontoTipo === 'dinheiro') { descontoCalculado = parseCurrency(descontoValorInput); } else { const porcentagem = parseFloat(descontoValorInput.replace(',', '.')) || 0; descontoCalculado = subtotal * (porcentagem / 100); } const totalGeral = subtotal - descontoCalculado; document.getElementById('subtotal-valor').textContent = formatarMoeda(subtotal); document.getElementById('desconto-valor-display').textContent = `- ${formatarMoeda(descontoCalculado)}`; document.getElementById('total-geral-valor').textContent = formatarMoeda(totalGeral); }
 function adicionarItem() { const descricao = document.getElementById('itemDescricao').value.trim(); const quantidade = parseInt(document.getElementById('itemQuantidade').value); const valorUnitario = parseCurrency(document.getElementById('itemValorUnitario').value); if (!descricao || isNaN(quantidade) || quantidade <= 0 || isNaN(valorUnitario) || valorUnitario <= 0) { mostrarNotificacao('Preencha todos os campos do item com valores válidos.', 'erro'); return; } const novoItem = { id: ++contadorItemId, descricao, quantidade, valorUnitario, valorTotal: quantidade * valorUnitario }; itensOrcamento.push(novoItem); renderizarTabelaItens(); document.getElementById('itemDescricao').value = ''; document.getElementById('itemQuantidade').value = '1'; document.getElementById('itemValorUnitario').value = ''; }
 function removerItem(itemId) { itensOrcamento = itensOrcamento.filter(item => item.id !== itemId); renderizarTabelaItens(); }
+async function carregarHistoricoOrcamentos(clienteId) { const container = document.getElementById('historico-container'); container.innerHTML = '<p>Carregando histórico...</p>'; try { const response = await fetch(`/api/orcamentos?cliente_id=${clienteId}`, { cache: 'no-cache' }); if (!response.ok) throw new Error('Falha ao buscar histórico.'); const orcamentos = await response.json(); if (orcamentos.length === 0) { container.innerHTML = '<div class="empty-state">Nenhum orçamento salvo para este cliente.</div>'; return; } let html = '<ul style="list-style-type: none; padding: 0;">'; orcamentos.forEach(o => { const data = new Date(o.data_criacao).toLocaleDateString('pt-BR'); let acaoBotao = ''; if (o.status === 'Criado' || o.status === 'Reprovado') { acaoBotao = `<button class="btn btn-primary btn-avancar-status" data-id="${o.id}" data-status="Aprovado" style="padding: 5px 10px; font-size: 0.8em;">Aprovar</button>`; } else if (o.status === 'Aprovado') { acaoBotao = `<button class="btn btn-primary btn-iniciar-producao" data-id="${o.id}" style="padding: 5px 10px; font-size: 0.8em;">Iniciar Produção</button>`; } else if (o.status === 'Em Produção') { acaoBotao = `<button class="btn btn-success btn-avancar-status" data-id="${o.id}" data-status="Concluído" style="padding: 5px 10px; font-size: 0.8em;">Concluir</button>`; } html += `<li style="background: #e9ecef; padding: 10px; border-radius: 8px; margin-bottom: 8px; display: grid; grid-template-columns: 1fr auto auto auto; gap: 10px; align-items: center;"> <div> <span><strong>${o.codigo_orcamento || `ORC-${String(o.id).padStart(4, '0')}`}</strong> - ${data}</span><br> <span style="font-size: 0.9em; color: #525f7f;">Status: <strong>${o.status}</strong></span> </div> <button class="btn btn-secondary btn-ver-pdf" data-id="${o.id}" style="padding: 5px 10px; font-size: 0.8em;">Ver PDF</button> <button class="btn btn-secondary btn-editar-orcamento" data-id="${o.id}" style="padding: 5px 10px; font-size: 0.8em;">Editar</button> ${acaoBotao} </li>`; }); html += '</ul>'; container.innerHTML = html; } catch (error) { console.error("Erro ao carregar histórico:", error); container.innerHTML = '<p>Erro ao carregar o histórico.</p>'; } }
+async function atualizarStatusOrcamento(orcamentoId, novoStatus, dadosExtras = {}) { const confirmMessage = dadosExtras.numero_oc ? `Tem certeza que deseja iniciar a produção com a OC "${dadosExtras.numero_oc}"?` : `Tem certeza que deseja alterar o status para "${novoStatus}"?`; if (!confirm(confirmMessage)) return; try { const response = await fetch(`/api/orcamentos?orcamento_id=${orcamentoId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: novoStatus, ...dadosExtras }) }); if (response.ok) { mostrarNotificacao('Status atualizado com sucesso!', 'sucesso'); if (clienteSelecionadoId) carregarHistoricoOrcamentos(clienteSelecionadoId); carregarPainelProducao(); // Atualiza o painel também } else { throw new Error('Falha ao atualizar o status.'); } } catch (error) { mostrarNotificacao('Não foi possível atualizar o status.', 'erro'); } }
+async function carregarOrcamentoParaEdicao(orcamentoId) { mostrarNotificacao('Carregando dados do orçamento para edição...', 'info'); try { const response = await fetch(`/api/orcamentos?orcamento_id=${orcamentoId}`, { cache: 'no-cache' }); if (!response.ok) throw new Error('Não foi possível carregar os detalhes do orçamento.'); const orcamento = await response.json(); orcamentoAtualId = orcamento.id; itensOrcamento = orcamento.itens.map(item => ({ id: ++contadorItemId, descricao: item.descricao, quantidade: item.quantidade, valorUnitario: parseFloat(item.valor_unitario), valorTotal: item.quantidade * parseFloat(item.valor_unitario) })); renderizarTabelaItens(); const descontoTipo = document.getElementById('descontoTipo'); const descontoValor = document.getElementById('descontoValor'); if (descontoTipo && descontoValor) { descontoTipo.value = orcamento.desconto_tipo || 'dinheiro'; if (orcamento.desconto_tipo === 'porcentagem') { const subtotal = orcamento.itens.reduce((acc, item) => acc + (item.quantidade * parseFloat(item.valor_unitario)), 0); const porcentagem = subtotal > 0 ? (parseFloat(orcamento.desconto_valor) / subtotal) * 100 : 0; descontoValor.value = porcentagem.toFixed(2).replace('.', ','); } else { descontoValor.value = String(parseFloat(orcamento.desconto_valor).toFixed(2)).replace('.', ','); formatarCampoMoeda(descontoValor); } } document.getElementById('observacoes').value = orcamento.observacoes || ''; mostrarNotificacao('Orçamento carregado. Edite e clique em "Salvar Orçamento".', 'info'); } catch (error) { console.error("Erro ao carregar orçamento para edição:", error); mostrarNotificacao(error.message, 'erro'); } }
+async function salvarOrcamento() { if (!clienteSelecionadoId) { mostrarNotificacao('Selecione um cliente para salvar.', 'erro'); return; } if (itensOrcamento.length === 0) { mostrarNotificacao('Adicione pelo menos um item.', 'erro'); return; } const subtotal = itensOrcamento.reduce((acc, item) => acc + item.valorTotal, 0); const descontoValorInput = document.getElementById('descontoValor').value; const descontoTipo = document.getElementById('descontoTipo').value; let descontoCalculado = 0; if (descontoTipo === 'dinheiro') { descontoCalculado = parseCurrency(descontoValorInput); } else { const porcentagem = parseFloat(descontoValorInput.replace(',', '.')) || 0; descontoCalculado = subtotal * (porcentagem / 100); } const valorTotal = subtotal - descontoCalculado; const orcamentoData = { cliente_id: clienteSelecionadoId, subtotal, desconto_valor: descontoCalculado, desconto_tipo: descontoTipo, valor_total: valorTotal, observacoes: document.getElementById('observacoes').value, itens: itensOrcamento.map(i => ({ descricao: i.descricao, quantidade: i.quantidade, valor_unitario: i.valorUnitario })) }; const isEditing = orcamentoAtualId !== null; const method = isEditing ? 'PUT' : 'POST'; const url = isEditing ? `/api/orcamentos?orcamento_id=${orcamentoAtualId}` : '/api/orcamentos'; try { const response = await fetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(orcamentoData) }); const result = await response.json(); if (response.ok) { mostrarNotificacao(result.message, 'sucesso'); carregarHistoricoOrcamentos(clienteSelecionadoId); carregarPainelProducao(); if (!isEditing) { orcamentoAtualId = result.orcamentoId; } } else { mostrarNotificacao(`Erro: ${result.error}`, 'erro'); } } catch (error) { mostrarNotificacao('Erro de conexão ao salvar orçamento.', 'erro'); } }
 
-async function carregarHistoricoOrcamentos(clienteId) {
-    const container = document.getElementById('historico-container');
-    container.innerHTML = '<p>Carregando histórico...</p>';
-    try {
-        const response = await fetch(`/api/orcamentos?cliente_id=${clienteId}`, { cache: 'no-cache' });
-        if (!response.ok) throw new Error('Falha ao buscar histórico.');
-        const orcamentos = await response.json();
-        if (orcamentos.length === 0) { container.innerHTML = '<div class="empty-state">Nenhum orçamento salvo para este cliente.</div>'; return; }
-        
-        let html = '<ul style="list-style-type: none; padding: 0;">';
-        orcamentos.forEach(o => {
-            const data = new Date(o.data_criacao).toLocaleDateString('pt-BR');
-            let acaoBotao = '';
-            // Define o botão de ação principal (Aprovar, Iniciar Produção, Concluir)
-            if (o.status === 'Criado' || o.status === 'Reprovado') { acaoBotao = `<button class="btn btn-primary btn-avancar-status" data-id="${o.id}" data-status="Aprovado" style="padding: 5px 10px; font-size: 0.8em;">Aprovar</button>`; }
-            else if (o.status === 'Aprovado') { acaoBotao = `<button class="btn btn-primary btn-iniciar-producao" data-id="${o.id}" style="padding: 5px 10px; font-size: 0.8em;">Iniciar Produção</button>`; }
-            else if (o.status === 'Em Produção') { acaoBotao = `<button class="btn btn-success btn-avancar-status" data-id="${o.id}" data-status="Concluído" style="padding: 5px 10px; font-size: 0.8em;">Concluir</button>`; }
-            
-            // ALTERAÇÃO: Adiciona botão "Editar" e muda o "Ver PDF"
-            html += `<li style="background: #e9ecef; padding: 10px; border-radius: 8px; margin-bottom: 8px; display: grid; grid-template-columns: 1fr auto auto auto; gap: 10px; align-items: center;"> 
-                        <div> 
-                            <span><strong>${o.codigo_orcamento || `ORC-${String(o.id).padStart(4, '0')}`}</strong> - ${data}</span><br> 
-                            <span style="font-size: 0.9em; color: #525f7f;">Status: <strong>${o.status}</strong></span> 
-                        </div> 
-                        <button class="btn btn-secondary btn-ver-pdf" data-id="${o.id}" style="padding: 5px 10px; font-size: 0.8em;">Ver PDF</button> 
-                        <button class="btn btn-secondary btn-editar-orcamento" data-id="${o.id}" style="padding: 5px 10px; font-size: 0.8em;">Editar</button> 
-                        ${acaoBotao} 
-                     </li>`;
-        });
-        html += '</ul>';
-        container.innerHTML = html;
-    } catch (error) { console.error("Erro ao carregar histórico:", error); container.innerHTML = '<p>Erro ao carregar o histórico.</p>'; }
-}
-
-async function atualizarStatusOrcamento(orcamentoId, novoStatus, dadosExtras = {}) { const confirmMessage = dadosExtras.numero_oc ? `Tem certeza que deseja iniciar a produção com a OC "${dadosExtras.numero_oc}"?` : `Tem certeza que deseja alterar o status para "${novoStatus}"?`; if (!confirm(confirmMessage)) return; try { const response = await fetch(`/api/orcamentos?orcamento_id=${orcamentoId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: novoStatus, ...dadosExtras }) }); if (response.ok) { mostrarNotificacao('Status atualizado com sucesso!', 'sucesso'); if (clienteSelecionadoId) carregarHistoricoOrcamentos(clienteSelecionadoId); } else { throw new Error('Falha ao atualizar o status.'); } } catch (error) { mostrarNotificacao('Não foi possível atualizar o status.', 'erro'); } }
-
-// FUNÇÃO RENOMEADA e sem alterações na lógica
-async function carregarOrcamentoParaEdicao(orcamentoId) {
-    mostrarNotificacao('Carregando dados do orçamento para edição...', 'info');
-    try {
-        const response = await fetch(`/api/orcamentos?orcamento_id=${orcamentoId}`, { cache: 'no-cache' });
-        if (!response.ok) throw new Error('Não foi possível carregar os detalhes do orçamento.');
-        const orcamento = await response.json();
-        orcamentoAtualId = orcamento.id; // Define que estamos em modo de edição
-        itensOrcamento = orcamento.itens.map(item => ({ id: ++contadorItemId, descricao: item.descricao, quantidade: item.quantidade, valorUnitario: parseFloat(item.valor_unitario), valorTotal: item.quantidade * parseFloat(item.valor_unitario) }));
-        renderizarTabelaItens();
-        const descontoTipo = document.getElementById('descontoTipo');
-        const descontoValor = document.getElementById('descontoValor');
-        if (descontoTipo && descontoValor) {
-            descontoTipo.value = orcamento.desconto_tipo || 'dinheiro';
-            if (orcamento.desconto_tipo === 'porcentagem') { const subtotal = orcamento.itens.reduce((acc, item) => acc + (item.quantidade * parseFloat(item.valor_unitario)), 0); const porcentagem = subtotal > 0 ? (parseFloat(orcamento.desconto_valor) / subtotal) * 100 : 0; descontoValor.value = porcentagem.toFixed(2).replace('.', ','); } else { descontoValor.value = String(parseFloat(orcamento.desconto_valor).toFixed(2)).replace('.', ','); formatarCampoMoeda(descontoValor); }
-        }
-        document.getElementById('observacoes').value = orcamento.observacoes || '';
-        mostrarNotificacao('Orçamento carregado. Você pode editar e salvar as alterações.', 'info');
-    } catch (error) {
-        console.error("Erro ao carregar orçamento para edição:", error);
-        mostrarNotificacao(error.message, 'erro');
-    }
-}
-
-async function salvarOrcamento() { if (!clienteSelecionadoId) { mostrarNotificacao('Selecione um cliente para salvar.', 'erro'); return; } if (itensOrcamento.length === 0) { mostrarNotificacao('Adicione pelo menos um item.', 'erro'); return; } const subtotal = itensOrcamento.reduce((acc, item) => acc + item.valorTotal, 0); const descontoValorInput = document.getElementById('descontoValor').value; const descontoTipo = document.getElementById('descontoTipo').value; let descontoCalculado = 0; if (descontoTipo === 'dinheiro') { descontoCalculado = parseCurrency(descontoValorInput); } else { const porcentagem = parseFloat(descontoValorInput.replace(',', '.')) || 0; descontoCalculado = subtotal * (porcentagem / 100); } const valorTotal = subtotal - descontoCalculado; const orcamentoData = { cliente_id: clienteSelecionadoId, subtotal, desconto_valor: descontoCalculado, desconto_tipo: descontoTipo, valor_total: valorTotal, observacoes: document.getElementById('observacoes').value, itens: itensOrcamento }; const isEditing = orcamentoAtualId !== null; const method = isEditing ? 'PUT' : 'POST'; const url = isEditing ? `/api/orcamentos?orcamento_id=${orcamentoAtualId}` : '/api/orcamentos'; try { const response = await fetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(orcamentoData) }); const result = await response.json(); if (response.ok) { mostrarNotificacao(result.message, 'sucesso'); carregarHistoricoOrcamentos(clienteSelecionadoId); if (!isEditing) { orcamentoAtualId = result.orcamentoId; } } else { mostrarNotificacao(`Erro: ${result.error}`, 'erro'); } } catch (error) { mostrarNotificacao('Erro de conexão ao salvar orçamento.', 'erro'); } }
-
-// --- FUNÇÕES DE PDF (RESTAURADAS E ADAPTADAS) ---
-// Função chamada pelo botão "Ver PDF" no histórico
-async function gerarPdfHistorico(orcamentoId) {
-    mostrarNotificacao('Gerando PDF do orçamento salvo...', 'info');
-    try {
-        const response = await fetch(`/api/orcamentos?orcamento_id=${orcamentoId}`, { cache: 'no-cache' });
-        if (!response.ok) throw new Error('Não foi possível carregar os dados para gerar o PDF.');
-        const orcamentoCompleto = await response.json();
-        criarPDF(orcamentoCompleto); // Chama a função que cria o PDF, passando os dados buscados
-    } catch(error) {
-        mostrarNotificacao(error.message, 'erro');
-        console.error("Erro ao gerar PDF do histórico:", error);
-    }
-}
-// Função chamada pelo botão "Gerar PDF" principal (do editor)
-function gerarPdfAtual() {
-    const clienteNome = document.getElementById('clienteNome').value.trim();
-    if (!clienteNome || itensOrcamento.length === 0) { mostrarNotificacao('Selecione um cliente e adicione itens para gerar o PDF.', 'erro'); return; }
-    const subtotal = itensOrcamento.reduce((acc, item) => acc + item.valorTotal, 0); const descontoValorInput = document.getElementById('descontoValor').value; const descontoTipo = document.getElementById('descontoTipo').value; let descontoCalculado = 0; if (descontoTipo === 'dinheiro') { descontoCalculado = parseCurrency(descontoValorInput); } else { const porcentagem = parseFloat(descontoValorInput.replace(',', '.')) || 0; descontoCalculado = subtotal * (porcentagem / 100); } const valorTotal = subtotal - descontoCalculado;
-    const dadosAtuais = {
-        id: orcamentoAtualId, codigo_orcamento: orcamentoAtualId ? `ORC-${String(orcamentoAtualId).padStart(4, '0')}` : 'Novo',
-        cliente_nome: clienteNome, cliente_cnpj_cpf: document.getElementById('clienteCnpjCpf').value, cliente_email: document.getElementById('clienteEmail').value, cliente_telefone: document.getElementById('clienteTelefone').value,
-        itens: itensOrcamento.map(i => ({ descricao: i.descricao, quantidade: i.quantidade, valor_unitario: i.valorUnitario })),
-        subtotal, desconto_valor: descontoCalculado, desconto_tipo: descontoTipo, valor_total: valorTotal, observacoes: document.getElementById('observacoes').value, data_criacao: new Date()
-    };
-    criarPDF(dadosAtuais);
-}
-// Função principal que monta o PDF (recebe os dados)
+// --- FUNÇÕES DE PDF ---
+async function gerarPdfHistorico(orcamentoId) { mostrarNotificacao('Gerando PDF do orçamento salvo...', 'info'); try { const response = await fetch(`/api/orcamentos?orcamento_id=${orcamentoId}`, { cache: 'no-cache' }); if (!response.ok) throw new Error('Não foi possível carregar os dados para gerar o PDF.'); const orcamentoCompleto = await response.json(); criarPDF(orcamentoCompleto); } catch(error) { mostrarNotificacao(error.message, 'erro'); console.error("Erro ao gerar PDF do histórico:", error); } }
+function gerarPdfAtual() { const clienteNome = document.getElementById('clienteNome').value.trim(); if (!clienteNome || itensOrcamento.length === 0) { mostrarNotificacao('Selecione um cliente e adicione itens para gerar o PDF.', 'erro'); return; } const subtotal = itensOrcamento.reduce((acc, item) => acc + item.valorTotal, 0); const descontoValorInput = document.getElementById('descontoValor').value; const descontoTipo = document.getElementById('descontoTipo').value; let descontoCalculado = 0; if (descontoTipo === 'dinheiro') { descontoCalculado = parseCurrency(descontoValorInput); } else { const porcentagem = parseFloat(descontoValorInput.replace(',', '.')) || 0; descontoCalculado = subtotal * (porcentagem / 100); } const valorTotal = subtotal - descontoCalculado; const dadosAtuais = { id: orcamentoAtualId, codigo_orcamento: orcamentoAtualId ? `ORC-${String(orcamentoAtualId).padStart(4, '0')}` : 'Novo', cliente_nome: clienteNome, cliente_cnpj_cpf: document.getElementById('clienteCnpjCpf').value, cliente_email: document.getElementById('clienteEmail').value, cliente_telefone: document.getElementById('clienteTelefone').value, itens: itensOrcamento.map(i => ({ descricao: i.descricao, quantidade: i.quantidade, valor_unitario: i.valorUnitario })), subtotal, desconto_valor: descontoCalculado, desconto_tipo: descontoTipo, valor_total: valorTotal, observacoes: document.getElementById('observacoes').value, data_criacao: new Date() }; criarPDF(dadosAtuais); }
 function criarPDF(orcamentoData) { const { jsPDF } = window.jspdf; const doc = new jsPDF(); const pageWidth = doc.internal.pageSize.width; const margin = 15; let yPosition = 20; const logoImg = new Image(); logoImg.crossOrigin = 'anonymous'; logoImg.onload = function() { const logoWidth = 30; const aspectRatio = this.naturalHeight / this.naturalWidth; const logoHeight = logoWidth * aspectRatio; const logoX = (pageWidth - logoWidth) / 2; doc.addImage(this, 'PNG', logoX, yPosition, logoWidth, logoHeight); yPosition += logoHeight + 5; continuarGeracaoPDF(doc, pageWidth, margin, yPosition, orcamentoData); }; logoImg.onerror = () => { yPosition += 10; continuarGeracaoPDF(doc, pageWidth, margin, yPosition, orcamentoData); }; logoImg.src = 'https://i.imgur.com/zerV906.png'; }
-// Função auxiliar que desenha o conteúdo do PDF
-function continuarGeracaoPDF(doc, pageWidth, margin, yPosition, orcamentoData) {
-    doc.setFontSize(22); doc.setFont('helvetica', 'bold'); doc.setTextColor(44, 62, 80); doc.text(`ORÇAMENTO ${orcamentoData.codigo_orcamento || `ORC-${String(orcamentoData.id).padStart(4, '0')}`}`, pageWidth / 2, yPosition, { align: 'center' }); yPosition += 15; const infoStartY = yPosition; let leftY = infoStartY; let rightY = infoStartY; const halfWidth = pageWidth / 2;
-    doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(44, 62, 80); doc.text('DADOS DA EMPRESA', margin, leftY); leftY += 5; doc.setLineWidth(0.2); doc.line(margin, leftY, halfWidth - margin / 2, leftY); leftY += 8; doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80); doc.setFont('helvetica', 'bold'); doc.text(document.querySelector('input[value="Fenix Fardamentos LTDA"]').value, margin, leftY); leftY += 6; doc.setFont('helvetica', 'normal'); doc.text(`CNPJ: ${document.querySelector('input[value="12.000.234/0001-18"]').value}`, margin, leftY); leftY += 5; doc.text(document.querySelector('input[value="Rua Pinheiro, 65 - Cidade Universitária"]').value, margin, leftY); leftY += 5; doc.text(`Telefone: ${document.querySelector('input[value="(82) 98814-4752"]').value}`, margin, leftY); leftY += 5; doc.text(`E-mail: ${document.querySelector('input[value="fenixfardamentos.al@gmail.com"]').value}`, margin, leftY); leftY += 5;
-    doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(44, 62, 80); doc.text('DADOS DO CLIENTE', halfWidth, rightY); rightY += 5; doc.line(halfWidth, rightY, pageWidth - margin, rightY); rightY += 8; doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80); doc.setFont('helvetica', 'bold'); doc.text(orcamentoData.cliente_nome || '', halfWidth, rightY); rightY += 6; doc.setFont('helvetica', 'normal'); if (orcamentoData.cliente_email) { doc.text(`E-mail: ${orcamentoData.cliente_email}`, halfWidth, rightY); rightY += 5; } if (orcamentoData.cliente_telefone) { doc.text(`Telefone: ${orcamentoData.cliente_telefone}`, halfWidth, rightY); rightY += 5; } if (orcamentoData.cliente_cnpj_cpf) { doc.text(`CPF/CNPJ: ${orcamentoData.cliente_cnpj_cpf}`, halfWidth, rightY); rightY += 5; }
-    yPosition = Math.max(leftY, rightY) + 15;
-    const tableData = orcamentoData.itens.map((item, index) => [ index + 1, item.descricao, item.quantidade, formatarMoeda(parseFloat(item.valor_unitario)), formatarMoeda(item.quantidade * parseFloat(item.valor_unitario)) ]); doc.autoTable({ head: [['#', 'Descrição', 'Qtd', 'V. Unitário', 'Total']], body: tableData, startY: yPosition, theme: 'grid', headStyles: { fillColor: [244, 164, 96], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' }, columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 1: { halign: 'left' }, 2: { halign: 'center', cellWidth: 15 }, 3: { halign: 'right', cellWidth: 30 }, 4: { halign: 'right', cellWidth: 30 } }, }); yPosition = doc.previousAutoTable.finalY + 10;
-    const subtotal = parseFloat(orcamentoData.subtotal); const descontoCalculado = parseFloat(orcamentoData.desconto_valor); const totalGeral = parseFloat(orcamentoData.valor_total); const totalBoxX = pageWidth / 2; doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80); doc.text(`Subtotal:`, totalBoxX, yPosition, { align: 'left' }); doc.text(formatarMoeda(subtotal), pageWidth - margin, yPosition, { align: 'right' }); yPosition += 7; doc.text(`Desconto:`, totalBoxX, yPosition, { align: 'left' }); doc.text(`- ${formatarMoeda(descontoCalculado)}`, pageWidth - margin, yPosition, { align: 'right' }); yPosition += 7; doc.setLineWidth(0.3); doc.setDrawColor(150, 150, 150); doc.line(totalBoxX, yPosition, pageWidth - margin, yPosition); yPosition += 8; doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(44, 62, 80); doc.text('TOTAL GERAL:', totalBoxX, yPosition, { align: 'left' }); doc.text(formatarMoeda(totalGeral), pageWidth - margin, yPosition, { align: 'right' });
-    const observacoes = orcamentoData.observacoes; if (observacoes) { yPosition += 15; const obsLines = doc.splitTextToSize(observacoes, pageWidth - margin * 2); if (yPosition + (obsLines.length * 5) + 15 > doc.internal.pageSize.height - 20) { doc.addPage(); yPosition = 20; } doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(44, 62, 80); doc.text('OBSERVAÇÕES', margin, yPosition); yPosition += 8; doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80); doc.text(obsLines, margin, yPosition); }
-    const dataEmissao = new Date(orcamentoData.data_criacao).toLocaleDateString('pt-BR'); for (let i = 1; i <= doc.internal.getNumberOfPages(); i++) { doc.setPage(i); const pageHeight = doc.internal.pageSize.height; doc.setFontSize(8); doc.setTextColor(120, 120, 120); doc.text(`Emitido em: ${dataEmissao}`, margin, pageHeight - 10); doc.text(`Página ${i} de ${doc.internal.getNumberOfPages()}`, pageWidth - margin, pageHeight - 10, { align: 'right' }); }
-    doc.output('dataurlnewwindow'); // Abre em nova aba
-}
+function continuarGeracaoPDF(doc, pageWidth, margin, yPosition, orcamentoData) { doc.setFontSize(22); doc.setFont('helvetica', 'bold'); doc.setTextColor(44, 62, 80); doc.text(`ORÇAMENTO ${orcamentoData.codigo_orcamento || `ORC-${String(orcamentoData.id).padStart(4, '0')}`}`, pageWidth / 2, yPosition, { align: 'center' }); yPosition += 15; const infoStartY = yPosition; let leftY = infoStartY; let rightY = infoStartY; const halfWidth = pageWidth / 2; doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(44, 62, 80); doc.text('DADOS DA EMPRESA', margin, leftY); leftY += 5; doc.setLineWidth(0.2); doc.line(margin, leftY, halfWidth - margin / 2, leftY); leftY += 8; doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80); doc.setFont('helvetica', 'bold'); doc.text(document.querySelector('input[value="Fenix Fardamentos LTDA"]').value, margin, leftY); leftY += 6; doc.setFont('helvetica', 'normal'); doc.text(`CNPJ: ${document.querySelector('input[value="12.000.234/0001-18"]').value}`, margin, leftY); leftY += 5; doc.text(document.querySelector('input[value="Rua Pinheiro, 65 - Cidade Universitária"]').value, margin, leftY); leftY += 5; doc.text(`Telefone: ${document.querySelector('input[value="(82) 98814-4752"]').value}`, margin, leftY); leftY += 5; doc.text(`E-mail: ${document.querySelector('input[value="fenixfardamentos.al@gmail.com"]').value}`, margin, leftY); leftY += 5; doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(44, 62, 80); doc.text('DADOS DO CLIENTE', halfWidth, rightY); rightY += 5; doc.line(halfWidth, rightY, pageWidth - margin, rightY); rightY += 8; doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80); doc.setFont('helvetica', 'bold'); doc.text(orcamentoData.cliente_nome || '', halfWidth, rightY); rightY += 6; doc.setFont('helvetica', 'normal'); if (orcamentoData.cliente_email) { doc.text(`E-mail: ${orcamentoData.cliente_email}`, halfWidth, rightY); rightY += 5; } if (orcamentoData.cliente_telefone) { doc.text(`Telefone: ${orcamentoData.cliente_telefone}`, halfWidth, rightY); rightY += 5; } if (orcamentoData.cliente_cnpj_cpf) { doc.text(`CPF/CNPJ: ${orcamentoData.cliente_cnpj_cpf}`, halfWidth, rightY); rightY += 5; } yPosition = Math.max(leftY, rightY) + 15; const tableData = orcamentoData.itens.map((item, index) => [ index + 1, item.descricao, item.quantidade, formatarMoeda(parseFloat(item.valor_unitario)), formatarMoeda(item.quantidade * parseFloat(item.valor_unitario)) ]); doc.autoTable({ head: [['#', 'Descrição', 'Qtd', 'V. Unitário', 'Total']], body: tableData, startY: yPosition, theme: 'grid', headStyles: { fillColor: [244, 164, 96], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' }, columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 1: { halign: 'left' }, 2: { halign: 'center', cellWidth: 15 }, 3: { halign: 'right', cellWidth: 30 }, 4: { halign: 'right', cellWidth: 30 } }, }); yPosition = doc.previousAutoTable.finalY + 10; const subtotal = parseFloat(orcamentoData.subtotal); const descontoCalculado = parseFloat(orcamentoData.desconto_valor); const totalGeral = parseFloat(orcamentoData.valor_total); const totalBoxX = pageWidth / 2; doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80); doc.text(`Subtotal:`, totalBoxX, yPosition, { align: 'left' }); doc.text(formatarMoeda(subtotal), pageWidth - margin, yPosition, { align: 'right' }); yPosition += 7; doc.text(`Desconto:`, totalBoxX, yPosition, { align: 'left' }); doc.text(`- ${formatarMoeda(descontoCalculado)}`, pageWidth - margin, yPosition, { align: 'right' }); yPosition += 7; doc.setLineWidth(0.3); doc.setDrawColor(150, 150, 150); doc.line(totalBoxX, yPosition, pageWidth - margin, yPosition); yPosition += 8; doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(44, 62, 80); doc.text('TOTAL GERAL:', totalBoxX, yPosition, { align: 'left' }); doc.text(formatarMoeda(totalGeral), pageWidth - margin, yPosition, { align: 'right' }); const observacoes = orcamentoData.observacoes; if (observacoes) { yPosition += 15; const obsLines = doc.splitTextToSize(observacoes, pageWidth - margin * 2); if (yPosition + (obsLines.length * 5) + 15 > doc.internal.pageSize.height - 20) { doc.addPage(); yPosition = 20; } doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(44, 62, 80); doc.text('OBSERVAÇÕES', margin, yPosition); yPosition += 8; doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80); doc.text(obsLines, margin, yPosition); } const dataEmissao = new Date(orcamentoData.data_criacao).toLocaleDateString('pt-BR'); for (let i = 1; i <= doc.internal.getNumberOfPages(); i++) { doc.setPage(i); const pageHeight = doc.internal.pageSize.height; doc.setFontSize(8); doc.setTextColor(120, 120, 120); doc.text(`Emitido em: ${dataEmissao}`, margin, pageHeight - 10); doc.text(`Página ${i} de ${doc.internal.getNumberOfPages()}`, pageWidth - margin, pageHeight - 10, { align: 'right' }); } doc.output('dataurlnewwindow'); }
 
 // --- FUNÇÕES DO PAINEL KANBAN E PAGAMENTOS ---
-async function carregarPainelProducao() { /* ... (sem alterações) ... */ }
-async function salvarPagamento() { /* ... (sem alterações) ... */ }
+async function carregarPainelProducao() { mostrarNotificacao('Atualizando painel...', 'info'); const colunas = { aprovado: document.getElementById('coluna-aprovado'), 'em-produção': document.getElementById('coluna-em-producao'), concluído: document.getElementById('coluna-concluido'), }; Object.values(colunas).forEach(c => c.innerHTML = ''); try { const response = await fetch('/api/orcamentos?painel_producao=true', { cache: 'no-cache' }); if (!response.ok) throw new Error('Falha ao carregar dados de produção.'); const orcamentos = await response.json(); if(orcamentos.length === 0) { document.getElementById('coluna-aprovado').innerHTML = '<div class="empty-state">Nenhum pedido nos estágios de produção.</div>'; } orcamentos.forEach(o => { const statusKey = o.status.toLowerCase().replace(' ', '-'); if (colunas[statusKey]) { const card = document.createElement('div'); card.className = 'kanban-card'; let paymentStatusHTML = ''; const totalPago = parseFloat(o.total_pago); const valorTotal = parseFloat(o.valor_total); if (totalPago >= valorTotal) { paymentStatusHTML = '<span class="payment-status status-pago">Pago</span>'; } else if (totalPago > 0) { paymentStatusHTML = `<span class="payment-status status-parcial">Parcial (${formatarMoeda(totalPago)})</span>`; } else { paymentStatusHTML = '<span class="payment-status status-pendente">Pendente</span>'; } card.innerHTML = ` <h4>${o.codigo_orcamento}</h4> <p>${o.cliente_nome}</p> <p><strong>Total: ${formatarMoeda(valorTotal)}</strong> ${paymentStatusHTML}</p> <div class="kanban-card-footer"> <button class="btn btn-secondary btn-visualizar-kanban" data-id="${o.id}">Detalhes</button> ${o.status === 'Concluído' ? `<button class="btn btn-success btn-registrar-pagamento" data-id="${o.id}" data-total="${valorTotal}" data-pago="${totalPago}">Pagamento</button>` : ''} </div> `; colunas[statusKey].appendChild(card); } }); } catch (error) { mostrarNotificacao(error.message, 'erro'); } }
+async function salvarPagamento() { const valorPago = parseCurrency(document.getElementById('inputValorPago').value); if (!valorPago || valorPago <= 0) { mostrarNotificacao('Insira um valor de pagamento válido.', 'erro'); return; } const dadosPagamento = { orcamento_id: orcamentoParaAcaoId, valor_pago: valorPago, metodo_pagamento: document.getElementById('selectMetodoPagamento').value, observacoes: document.getElementById('inputObsPagamento').value, }; try { const response = await fetch('/api/pagamentos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dadosPagamento), }); if (response.ok) { mostrarNotificacao('Pagamento registrado com sucesso!', 'sucesso'); document.getElementById('pagamentoModal').style.display = 'none'; carregarPainelProducao(); } else { throw new Error('Falha ao registrar o pagamento.'); } } catch (error) { mostrarNotificacao(error.message, 'erro'); } }
+
+// --- NOVA FUNÇÃO: Limpa o formulário para um novo orçamento ---
+function novoOrcamento() {
+    // Limpa os campos do cliente (opcional, pode querer manter o último selecionado)
+    // document.getElementById('clienteExistente').value = "";
+    // selecionarCliente(); // Isso já limpa os inputs de cliente
+    
+    // Limpa os itens do orçamento
+    itensOrcamento = [];
+    renderizarTabelaItens(); // Isso também limpará a seção de totais
+    
+    // Limpa o formulário de adicionar item
+    document.getElementById('itemDescricao').value = '';
+    document.getElementById('itemQuantidade').value = '1';
+    document.getElementById('itemValorUnitario').value = '';
+
+    // Limpa as observações
+    document.getElementById('observacoes').value = 'Forma de pagamento: 50% na encomenda e 50% na entrega. Prazo de entrega: 30 dias a partir da confirmação do pedido.'; // Volta ao padrão
+
+    // Reseta o ID do orçamento em edição
+    orcamentoAtualId = null;
+
+    mostrarNotificacao('Formulário limpo. Pronto para um novo orçamento!', 'info');
+}
+
 
 // --- INICIALIZAÇÃO E EVENTOS ---
 function conectarEventosApp() {
@@ -158,39 +89,19 @@ function conectarEventosApp() {
     document.getElementById('itensContainer').addEventListener('click', (e) => { const target = e.target.closest('button'); if (target && target.classList.contains('btn-remover-item')) { const itemId = parseInt(target.dataset.id, 10); removerItem(itemId); } });
     document.getElementById('totaisContainer').addEventListener('input', (e) => { if (e.target && e.target.id === 'descontoValor') { atualizarTotais(); } });
     document.getElementById('totaisContainer').addEventListener('change', (e) => { if (e.target && e.target.id === 'descontoTipo') { atualizarTotais(); } });
-    
-    // Listener do Histórico ATUALIZADO para incluir botão Editar
-    document.getElementById('historico-container').addEventListener('click', (e) => {
-        const target = e.target.closest('button');
-        if (!target) return;
-        const orcamentoId = target.dataset.id; // Pegamos o ID do orçamento alvo
-        if (target.classList.contains('btn-ver-pdf')) {
-            gerarPdfHistorico(orcamentoId); // Chama a função para gerar PDF do histórico
-        }
-        if (target.classList.contains('btn-editar-orcamento')) {
-            carregarOrcamentoParaEdicao(orcamentoId); // Chama a função para carregar dados no editor
-        }
-        if (target.classList.contains('btn-iniciar-producao')) {
-            orcamentoParaAcaoId = orcamentoId;
-            document.getElementById('ocModal').style.display = 'flex';
-        }
-        if (target.classList.contains('btn-avancar-status')) {
-            const novoStatus = target.dataset.status;
-            atualizarStatusOrcamento(orcamentoId, novoStatus);
-        }
-    });
-
-    document.getElementById('kanban-board').addEventListener('click', (e) => { /* ... (sem alterações) ... */ });
-    document.getElementById('btnConfirmarOC').addEventListener('click', () => { /* ... (sem alterações) ... */ });
+    document.getElementById('historico-container').addEventListener('click', (e) => { const target = e.target.closest('button'); if (!target) return; const orcamentoId = target.dataset.id; if (target.classList.contains('btn-ver-pdf')) { gerarPdfHistorico(orcamentoId); } if (target.classList.contains('btn-editar-orcamento')) { carregarOrcamentoParaEdicao(orcamentoId); } if (target.classList.contains('btn-iniciar-producao')) { orcamentoParaAcaoId = orcamentoId; document.getElementById('ocModal').style.display = 'flex'; } if (target.classList.contains('btn-avancar-status')) { const novoStatus = target.dataset.status; atualizarStatusOrcamento(orcamentoId, novoStatus); } });
+    document.getElementById('kanban-board').addEventListener('click', (e) => { const target = e.target.closest('button'); if (!target) return; orcamentoParaAcaoId = target.dataset.id; if (target.classList.contains('btn-visualizar-kanban')) { alternarAbas('gerador'); carregarOrcamentoParaEdicao(orcamentoParaAcaoId); } if (target.classList.contains('btn-registrar-pagamento')) { const total = parseFloat(target.dataset.total); const pago = parseFloat(target.dataset.pago); document.getElementById('pagamentoModalTitle').textContent = `Saldo Devedor: ${formatarMoeda(total - pago)}`; document.getElementById('pagamentoModal').style.display = 'flex'; } });
+    document.getElementById('btnConfirmarOC').addEventListener('click', () => { const numeroOC = document.getElementById('inputNumeroOC').value; if (!numeroOC) { mostrarNotificacao('O número da OC é obrigatório.', 'erro'); return; } atualizarStatusOrcamento(orcamentoParaAcaoId, 'Em Produção', { numero_oc: numeroOC }); document.getElementById('ocModal').style.display = 'none'; });
     document.getElementById('btnSalvarPagamento').addEventListener('click', salvarPagamento);
     document.getElementById('inputValorPago').addEventListener('input', (e) => formatarCampoMoeda(e.target));
     
-    // Listener do botão "Gerar PDF" (do editor) ATUALIZADO
-    document.getElementById('btnGerarPDF').addEventListener('click', gerarPdfAtual);
+    // Conecta o novo botão
+    document.getElementById('btnNovoOrcamento').addEventListener('click', novoOrcamento);
     
+    document.getElementById('btnGerarPDF').addEventListener('click', gerarPdfAtual);
     document.getElementById('btnSalvarOrcamento').addEventListener('click', salvarOrcamento);
     
-    // REMOVIDOS os listeners do modal de compartilhamento
+    // Removidos os listeners do modal antigo de compartilhamento
 }
 
 document.addEventListener('DOMContentLoaded', () => {
