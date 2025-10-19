@@ -1,4 +1,4 @@
-// Arquivo: script.js (Versão 1.3.12)
+// Arquivo: script.js (Versão 1.3.12 - Estável)
 
 // --- VARIÁVEIS GLOBAIS ---
 let clientesCache = [];
@@ -7,6 +7,7 @@ let contadorItemId = 0;
 let clienteSelecionadoId = null;
 let orcamentoAtualId = null;
 let orcamentoParaAcaoId = null;
+let saldoDevedorAtual = 0; // Nova variável global para guardar o saldo ao abrir o modal
 
 // --- FUNÇÃO DE NOTIFICAÇÃO ---
 function mostrarNotificacao(mensagem, tipo = 'sucesso') { const container = document.getElementById('notification-container'); if (!container) return; const toast = document.createElement('div'); toast.className = `toast ${tipo}`; toast.textContent = mensagem; container.appendChild(toast); setTimeout(() => { toast.remove(); }, 4000); }
@@ -34,119 +35,11 @@ function renderizarOuAtualizarTotais() { const totaisContainer = document.getEle
 function atualizarTotais() { if (itensOrcamento.length === 0 || !document.getElementById('total-section-id')) return; const subtotal = itensOrcamento.reduce((acc, item) => acc + item.valorTotal, 0); const descontoValorInput = document.getElementById('descontoValor').value; const descontoTipo = document.getElementById('descontoTipo').value; let descontoCalculado = 0; if (descontoTipo === 'dinheiro') { descontoCalculado = parseCurrency(descontoValorInput); } else { const porcentagem = parseFloat(descontoValorInput.replace(',', '.')) || 0; descontoCalculado = subtotal * (porcentagem / 100); } const totalGeral = subtotal - descontoCalculado; document.getElementById('subtotal-valor').textContent = formatarMoeda(subtotal); document.getElementById('desconto-valor-display').textContent = `- ${formatarMoeda(descontoCalculado)}`; document.getElementById('total-geral-valor').textContent = formatarMoeda(totalGeral); }
 function adicionarItem() { const descricao = document.getElementById('itemDescricao').value.trim(); const quantidade = parseInt(document.getElementById('itemQuantidade').value); const valorUnitario = parseCurrency(document.getElementById('itemValorUnitario').value); if (!descricao || isNaN(quantidade) || quantidade <= 0 || isNaN(valorUnitario) || valorUnitario <= 0) { mostrarNotificacao('Preencha todos os campos do item com valores válidos.', 'erro'); return; } const novoItem = { id: ++contadorItemId, descricao, quantidade, valorUnitario, valorTotal: quantidade * valorUnitario }; itensOrcamento.push(novoItem); renderizarTabelaItens(); document.getElementById('itemDescricao').value = ''; document.getElementById('itemQuantidade').value = '1'; document.getElementById('itemValorUnitario').value = ''; }
 function removerItem(itemId) { itensOrcamento = itensOrcamento.filter(item => item.id !== itemId); renderizarTabelaItens(); }
-
-async function carregarHistoricoOrcamentos(clienteId) {
-    const container = document.getElementById('historico-container');
-    container.innerHTML = '<p>Carregando histórico...</p>';
-    try {
-        const response = await fetch(`/api/orcamentos?cliente_id=${clienteId}`, { cache: 'no-cache' });
-        if (!response.ok) throw new Error('Falha ao buscar histórico.');
-        const orcamentos = await response.json();
-        if (orcamentos.length === 0) { container.innerHTML = '<div class="empty-state">Nenhum orçamento salvo para este cliente.</div>'; return; }
-        
-        let html = '<ul style="list-style-type: none; padding: 0;">';
-        orcamentos.forEach(o => {
-            const data = new Date(o.data_criacao).toLocaleDateString('pt-BR');
-            const totalPago = parseFloat(o.total_pago);
-            const podeEditar = o.status !== 'Em Produção' && o.status !== 'Concluído';
-            let botoesAcaoStatus = '';
-            let botaoEditarHTML = '';
-            let botaoPagamentoHist = ''; // Botão de pagamento para Aprovado/Concluído
-
-            if (o.status === 'Criado' || o.status === 'Reprovado') { 
-                botoesAcaoStatus = `<button class="btn btn-primary btn-avancar-status" data-id="${o.id}" data-status="Aprovado" style="padding: 5px 10px; font-size: 0.8em;">Aprovar</button>`; 
-            } else if (o.status === 'Aprovado') { 
-                botaoPagamentoHist = `<button class="btn btn-success btn-registrar-pagamento-hist" data-id="${o.id}" data-total="${o.valor_total}" data-pago="${totalPago}" style="padding: 5px 10px; font-size: 0.8em;">Pagamento</button>`;
-                botoesAcaoStatus = `<button class="btn btn-primary btn-iniciar-producao" data-id="${o.id}" data-pago="${totalPago}" style="padding: 5px 10px; font-size: 0.8em;">Iniciar Produção</button>`; 
-            } else if (o.status === 'Em Produção') { 
-                botoesAcaoStatus = `<button class="btn btn-success btn-avancar-status" data-id="${o.id}" data-status="Concluído" style="padding: 5px 10px; font-size: 0.8em;">Concluir</button>`; 
-            } else if (o.status === 'Concluído') {
-                botaoPagamentoHist = `<button class="btn btn-success btn-registrar-pagamento-hist" data-id="${o.id}" data-total="${o.valor_total}" data-pago="${totalPago}" style="padding: 5px 10px; font-size: 0.8em;">Pagamento</button>`;
-            }
-
-            // Só mostra o botão Editar se puder editar
-            if (podeEditar) {
-                botaoEditarHTML = `<button class="btn btn-secondary btn-editar-orcamento" data-id="${o.id}" style="padding: 5px 10px; font-size: 0.8em;">Editar</button>`;
-            }
-            
-            // Adiciona o botão Excluir
-            const botaoExcluirHTML = `<button class="btn btn-danger btn-excluir-orcamento" data-id="${o.id}" style="padding: 5px 10px; font-size: 0.8em;">Excluir</button>`;
-
-            // Ajusta o grid para acomodar mais botões se necessário
-            const gridColumns = `1fr repeat(${[botaoEditarHTML, botaoPagamentoHist, botoesAcaoStatus, botaoExcluirHTML].filter(Boolean).length + 1}, auto)`; // +1 para o Ver PDF
-
-            html += `<li style="background: #e9ecef; padding: 10px; border-radius: 8px; margin-bottom: 8px; display: grid; grid-template-columns: ${gridColumns}; gap: 10px; align-items: center;"> 
-                        <div> 
-                            <span><strong>${o.codigo_orcamento || `ORC-${String(o.id).padStart(4, '0')}`}</strong> - ${data}</span><br> 
-                            <span style="font-size: 0.9em; color: #525f7f;">Status: <strong>${o.status}</strong></span> 
-                        </div> 
-                        <button class="btn btn-secondary btn-ver-pdf" data-id="${o.id}" style="padding: 5px 10px; font-size: 0.8em;">Ver PDF</button> 
-                        ${botaoEditarHTML}
-                        ${botaoPagamentoHist}
-                        ${botoesAcaoStatus} 
-                        ${botaoExcluirHTML}
-                     </li>`;
-        });
-        html += '</ul>';
-        container.innerHTML = html;
-    } catch (error) { console.error("Erro ao carregar histórico:", error); container.innerHTML = '<p>Erro ao carregar o histórico.</p>'; }
-}
-
+async function carregarHistoricoOrcamentos(clienteId) { const container = document.getElementById('historico-container'); container.innerHTML = '<p>Carregando histórico...</p>'; try { const response = await fetch(`/api/orcamentos?cliente_id=${clienteId}`, { cache: 'no-cache' }); if (!response.ok) throw new Error('Falha ao buscar histórico.'); const orcamentos = await response.json(); if (orcamentos.length === 0) { container.innerHTML = '<div class="empty-state">Nenhum orçamento salvo para este cliente.</div>'; return; } let html = '<ul style="list-style-type: none; padding: 0;">'; orcamentos.forEach(o => { const data = new Date(o.data_criacao).toLocaleDateString('pt-BR'); const totalPago = parseFloat(o.total_pago); const valorTotal = parseFloat(o.valor_total); const podeEditar = o.status !== 'Em Produção' && o.status !== 'Concluído'; let botoesAcaoStatus = ''; let botaoEditarHTML = ''; let botaoPagamentoHist = ''; if (o.status === 'Criado' || o.status === 'Reprovado') { botoesAcaoStatus = `<button class="btn btn-primary btn-avancar-status" data-id="${o.id}" data-status="Aprovado" style="padding: 5px 10px; font-size: 0.8em;">Aprovar</button>`; } else if (o.status === 'Aprovado') { botaoPagamentoHist = `<button class="btn btn-success btn-registrar-pagamento-hist" data-id="${o.id}" data-total="${valorTotal}" data-pago="${totalPago}" style="padding: 5px 10px; font-size: 0.8em;">Pagamento</button>`; botoesAcaoStatus = `<button class="btn btn-primary btn-iniciar-producao" data-id="${o.id}" data-pago="${totalPago}" style="padding: 5px 10px; font-size: 0.8em;">Iniciar Produção</button>`; } else if (o.status === 'Em Produção') { botoesAcaoStatus = `<button class="btn btn-success btn-avancar-status" data-id="${o.id}" data-status="Concluído" style="padding: 5px 10px; font-size: 0.8em;">Concluir</button>`; } else if (o.status === 'Concluído') { botaoPagamentoHist = `<button class="btn btn-success btn-registrar-pagamento-hist" data-id="${o.id}" data-total="${valorTotal}" data-pago="${totalPago}" style="padding: 5px 10px; font-size: 0.8em;">Pagamento</button>`; } if (podeEditar) { botaoEditarHTML = `<button class="btn btn-secondary btn-editar-orcamento" data-id="${o.id}" style="padding: 5px 10px; font-size: 0.8em;">Editar</button>`; } const botaoExcluirHTML = `<button class="btn btn-danger btn-excluir-orcamento" data-id="${o.id}" style="padding: 5px 10px; font-size: 0.8em;">Excluir</button>`; const gridColumns = `1fr repeat(${[botaoEditarHTML, botaoPagamentoHist, botoesAcaoStatus, botaoExcluirHTML].filter(Boolean).length + 1}, auto)`; html += `<li style="background: #e9ecef; padding: 10px; border-radius: 8px; margin-bottom: 8px; display: grid; grid-template-columns: ${gridColumns}; gap: 10px; align-items: center;"> <div> <span><strong>${o.codigo_orcamento || `ORC-${String(o.id).padStart(4, '0')}`}</strong> - ${data}</span><br> <span style="font-size: 0.9em; color: #525f7f;">Status: <strong>${o.status}</strong></span> </div> <button class="btn btn-secondary btn-ver-pdf" data-id="${o.id}" style="padding: 5px 10px; font-size: 0.8em;">Ver PDF</button> ${botaoEditarHTML} ${botaoPagamentoHist} ${botoesAcaoStatus} ${botaoExcluirHTML} </li>`; }); html += '</ul>'; container.innerHTML = html; } catch (error) { console.error("Erro ao carregar histórico:", error); container.innerHTML = '<p>Erro ao carregar o histórico.</p>'; } }
 async function atualizarStatusOrcamento(orcamentoId, novoStatus, dadosExtras = {}) { const confirmMessage = dadosExtras.numero_oc ? `Tem certeza que deseja iniciar a produção com a OC "${dadosExtras.numero_oc}"?` : `Tem certeza que deseja alterar o status para "${novoStatus}"?`; if (!confirm(confirmMessage)) return; try { const response = await fetch(`/api/orcamentos?orcamento_id=${orcamentoId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: novoStatus, ...dadosExtras }) }); if (response.ok) { mostrarNotificacao('Status atualizado com sucesso!', 'sucesso'); if (clienteSelecionadoId) carregarHistoricoOrcamentos(clienteSelecionadoId); carregarPainelProducao(); } else { throw new Error('Falha ao atualizar o status.'); } } catch (error) { mostrarNotificacao('Não foi possível atualizar o status.', 'erro'); } }
-
-async function carregarOrcamentoParaEdicao(orcamentoId) {
-    mostrarNotificacao('Carregando dados do orçamento para edição...', 'info');
-    try {
-        const response = await fetch(`/api/orcamentos?orcamento_id=${orcamentoId}`, { cache: 'no-cache' });
-        if (!response.ok) throw new Error('Não foi possível carregar os detalhes do orçamento.');
-        const orcamento = await response.json();
-        
-        // Verificação extra no frontend
-        if (orcamento.status === 'Em Produção' || orcamento.status === 'Concluído') {
-             mostrarNotificacao('Orçamentos em produção ou concluídos não podem ser editados.', 'erro');
-             return; // Interrompe a função
-        }
-
-        orcamentoAtualId = orcamento.id;
-        itensOrcamento = orcamento.itens.map(item => ({ id: ++contadorItemId, descricao: item.descricao, quantidade: item.quantidade, valorUnitario: parseFloat(item.valor_unitario), valorTotal: item.quantidade * parseFloat(item.valor_unitario) }));
-        renderizarTabelaItens();
-        const descontoTipo = document.getElementById('descontoTipo'); const descontoValor = document.getElementById('descontoValor'); if (descontoTipo && descontoValor) { descontoTipo.value = orcamento.desconto_tipo || 'dinheiro'; if (orcamento.desconto_tipo === 'porcentagem') { const subtotal = orcamento.itens.reduce((acc, item) => acc + (item.quantidade * parseFloat(item.valor_unitario)), 0); const porcentagem = subtotal > 0 ? (parseFloat(orcamento.desconto_valor) / subtotal) * 100 : 0; descontoValor.value = porcentagem.toFixed(2).replace('.', ','); } else { descontoValor.value = String(parseFloat(orcamento.desconto_valor).toFixed(2)).replace('.', ','); formatarCampoMoeda(descontoValor); } }
-        document.getElementById('observacoes').value = orcamento.observacoes || '';
-        mostrarNotificacao('Orçamento carregado. Edite e clique em "Salvar Orçamento".', 'info');
-    } catch (error) {
-        console.error("Erro ao carregar orçamento para edição:", error);
-        mostrarNotificacao(error.message, 'erro');
-    }
-}
-
+async function carregarOrcamentoParaEdicao(orcamentoId) { mostrarNotificacao('Carregando dados do orçamento para edição...', 'info'); try { const response = await fetch(`/api/orcamentos?orcamento_id=${orcamentoId}`, { cache: 'no-cache' }); if (!response.ok) throw new Error('Não foi possível carregar os detalhes do orçamento.'); const orcamento = await response.json(); if (orcamento.status === 'Em Produção' || orcamento.status === 'Concluído') { mostrarNotificacao('Orçamentos em produção ou concluídos não podem ser editados.', 'erro'); return; } orcamentoAtualId = orcamento.id; itensOrcamento = orcamento.itens.map(item => ({ id: ++contadorItemId, descricao: item.descricao, quantidade: item.quantidade, valorUnitario: parseFloat(item.valor_unitario), valorTotal: item.quantidade * parseFloat(item.valor_unitario) })); renderizarTabelaItens(); const descontoTipo = document.getElementById('descontoTipo'); const descontoValor = document.getElementById('descontoValor'); if (descontoTipo && descontoValor) { descontoTipo.value = orcamento.desconto_tipo || 'dinheiro'; if (orcamento.desconto_tipo === 'porcentagem') { const subtotal = orcamento.itens.reduce((acc, item) => acc + (item.quantidade * parseFloat(item.valor_unitario)), 0); const porcentagem = subtotal > 0 ? (parseFloat(orcamento.desconto_valor) / subtotal) * 100 : 0; descontoValor.value = porcentagem.toFixed(2).replace('.', ','); } else { descontoValor.value = String(parseFloat(orcamento.desconto_valor).toFixed(2)).replace('.', ','); formatarCampoMoeda(descontoValor); } } document.getElementById('observacoes').value = orcamento.observacoes || ''; mostrarNotificacao('Orçamento carregado. Edite e clique em "Salvar Orçamento".', 'info'); } catch (error) { console.error("Erro ao carregar orçamento para edição:", error); mostrarNotificacao(error.message, 'erro'); } }
 async function salvarOrcamento() { if (!clienteSelecionadoId) { mostrarNotificacao('Selecione um cliente para salvar.', 'erro'); return; } if (itensOrcamento.length === 0) { mostrarNotificacao('Adicione pelo menos um item.', 'erro'); return; } const subtotal = itensOrcamento.reduce((acc, item) => acc + item.valorTotal, 0); const descontoValorInput = document.getElementById('descontoValor').value; const descontoTipo = document.getElementById('descontoTipo').value; let descontoCalculado = 0; if (descontoTipo === 'dinheiro') { descontoCalculado = parseCurrency(descontoValorInput); } else { const porcentagem = parseFloat(descontoValorInput.replace(',', '.')) || 0; descontoCalculado = subtotal * (porcentagem / 100); } const valorTotal = subtotal - descontoCalculado; const orcamentoData = { cliente_id: clienteSelecionadoId, subtotal, desconto_valor: descontoCalculado, desconto_tipo: descontoTipo, valor_total: valorTotal, observacoes: document.getElementById('observacoes').value, itens: itensOrcamento.map(i => ({ descricao: i.descricao, quantidade: i.quantidade, valor_unitario: i.valorUnitario })) }; const isEditing = orcamentoAtualId !== null; const method = isEditing ? 'PUT' : 'POST'; const url = isEditing ? `/api/orcamentos?orcamento_id=${orcamentoAtualId}` : '/api/orcamentos'; try { const response = await fetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(orcamentoData) }); const result = await response.json(); if (response.ok) { mostrarNotificacao(result.message, 'sucesso'); carregarHistoricoOrcamentos(clienteSelecionadoId); carregarPainelProducao(); if (!isEditing) { orcamentoAtualId = result.orcamentoId; } } else { mostrarNotificacao(`Erro: ${result.error}`, 'erro'); } } catch (error) { mostrarNotificacao('Erro de conexão ao salvar orçamento.', 'erro'); } }
-
-// NOVA FUNÇÃO: Excluir um orçamento
-async function excluirOrcamento(orcamentoId) {
-    if (!confirm('Tem certeza que deseja excluir este orçamento permanentemente? Esta ação não pode ser desfeita.')) {
-        return;
-    }
-    mostrarNotificacao('Excluindo orçamento...', 'info');
-    try {
-        const response = await fetch(`/api/orcamentos?orcamento_id=${orcamentoId}`, {
-            method: 'DELETE'
-        });
-        const result = await response.json();
-        if (response.ok) {
-            mostrarNotificacao(result.message, 'sucesso');
-            // Se o orçamento excluído era o que estava em edição, limpa a tela
-            if (orcamentoAtualId == orcamentoId) {
-                novoOrcamento();
-            }
-            if (clienteSelecionadoId) carregarHistoricoOrcamentos(clienteSelecionadoId);
-            carregarPainelProducao();
-        } else {
-            throw new Error(result.error || 'Falha ao excluir o orçamento.');
-        }
-    } catch (error) {
-        mostrarNotificacao(error.message, 'erro');
-    }
-}
+async function excluirOrcamento(orcamentoId) { if (!confirm('Tem certeza que deseja excluir este orçamento permanentemente? Esta ação não pode ser desfeita.')) { return; } mostrarNotificacao('Excluindo orçamento...', 'info'); try { const response = await fetch(`/api/orcamentos?orcamento_id=${orcamentoId}`, { method: 'DELETE' }); const result = await response.json(); if (response.ok) { mostrarNotificacao(result.message, 'sucesso'); if (orcamentoAtualId == orcamentoId) { novoOrcamento(); } if (clienteSelecionadoId) carregarHistoricoOrcamentos(clienteSelecionadoId); carregarPainelProducao(); } else { throw new Error(result.error || 'Falha ao excluir o orçamento.'); } } catch (error) { mostrarNotificacao(error.message, 'erro'); } }
 
 // --- FUNÇÕES DE PDF ---
 async function gerarPdfHistorico(orcamentoId) { mostrarNotificacao('Gerando PDF do orçamento salvo...', 'info'); try { const response = await fetch(`/api/orcamentos?orcamento_id=${orcamentoId}`, { cache: 'no-cache' }); if (!response.ok) throw new Error('Não foi possível carregar os dados para gerar o PDF.'); const orcamentoCompleto = await response.json(); criarPDF(orcamentoCompleto); } catch(error) { mostrarNotificacao(error.message, 'erro'); console.error("Erro ao gerar PDF do histórico:", error); } }
@@ -156,7 +49,34 @@ function continuarGeracaoPDF(doc, pageWidth, margin, yPosition, orcamentoData) {
 
 // --- FUNÇÕES DO PAINEL KANBAN E PAGAMENTOS ---
 async function carregarPainelProducao() { mostrarNotificacao('Atualizando painel...', 'info'); const colunas = { aprovado: document.getElementById('coluna-aprovado'), 'em-produção': document.getElementById('coluna-em-producao'), concluído: document.getElementById('coluna-concluido'), }; Object.values(colunas).forEach(c => c.innerHTML = ''); try { const response = await fetch('/api/orcamentos?painel_producao=true', { cache: 'no-cache' }); if (!response.ok) throw new Error('Falha ao carregar dados de produção.'); const orcamentos = await response.json(); if(orcamentos.length === 0) { document.getElementById('coluna-aprovado').innerHTML = '<div class="empty-state">Nenhum pedido nos estágios de produção.</div>'; document.getElementById('coluna-em-producao').innerHTML = ''; document.getElementById('coluna-concluido').innerHTML = '';} orcamentos.forEach(o => { const statusKey = o.status.toLowerCase().replace(' ', '-'); if (colunas[statusKey]) { const card = document.createElement('div'); card.className = 'kanban-card'; let paymentStatusHTML = ''; const totalPago = parseFloat(o.total_pago); const valorTotal = parseFloat(o.valor_total); if (totalPago >= valorTotal) { paymentStatusHTML = '<span class="payment-status status-pago">Pago</span>'; } else if (totalPago > 0) { paymentStatusHTML = `<span class="payment-status status-parcial">Parcial (${formatarMoeda(totalPago)})</span>`; } else { paymentStatusHTML = '<span class="payment-status status-pendente">Pendente</span>'; } card.innerHTML = ` <h4>${o.codigo_orcamento}</h4> <p>${o.cliente_nome}</p> <p><strong>Total: ${formatarMoeda(valorTotal)}</strong> ${paymentStatusHTML}</p> <div class="kanban-card-footer"> <button class="btn btn-secondary btn-visualizar-kanban" data-id="${o.id}">Detalhes</button> ${o.status === 'Concluído' ? `<button class="btn btn-success btn-registrar-pagamento" data-id="${o.id}" data-total="${valorTotal}" data-pago="${totalPago}">Pagamento</button>` : ''} </div> `; colunas[statusKey].appendChild(card); } }); } catch (error) { mostrarNotificacao(error.message, 'erro'); } }
-async function salvarPagamento() { const valorPago = parseCurrency(document.getElementById('inputValorPago').value); if (!valorPago || valorPago <= 0) { mostrarNotificacao('Insira um valor de pagamento válido.', 'erro'); return; } const dadosPagamento = { orcamento_id: orcamentoParaAcaoId, valor_pago: valorPago, metodo_pagamento: document.getElementById('selectMetodoPagamento').value, observacoes: document.getElementById('inputObsPagamento').value, }; try { const response = await fetch('/api/pagamentos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dadosPagamento), }); if (response.ok) { mostrarNotificacao('Pagamento registrado com sucesso!', 'sucesso'); document.getElementById('pagamentoModal').style.display = 'none'; if (clienteSelecionadoId) carregarHistoricoOrcamentos(clienteSelecionadoId); carregarPainelProducao(); } else { throw new Error('Falha ao registrar o pagamento.'); } } catch (error) { mostrarNotificacao(error.message, 'erro'); } }
+async function salvarPagamento() {
+    const valorPagoInput = document.getElementById('inputValorPago');
+    const valorPago = parseCurrency(valorPagoInput.value);
+    
+    // Validação: Não pode ser zero ou negativo
+    if (!valorPago || valorPago <= 0) {
+        mostrarNotificacao('Insira um valor de pagamento válido.', 'erro');
+        return;
+    }
+    // Validação: Não pode ser maior que o saldo devedor
+    if (valorPago > saldoDevedorAtual + 0.001) { // Adiciona pequena margem para erros de ponto flutuante
+         mostrarNotificacao(`Valor excede o saldo devedor (${formatarMoeda(saldoDevedorAtual)}).`, 'erro');
+         return;
+    }
+
+    const dadosPagamento = { orcamento_id: orcamentoParaAcaoId, valor_pago: valorPago, metodo_pagamento: document.getElementById('selectMetodoPagamento').value, observacoes: document.getElementById('inputObsPagamento').value, }; 
+    try { 
+        const response = await fetch('/api/pagamentos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dadosPagamento), }); 
+        if (response.ok) { 
+            mostrarNotificacao('Pagamento registrado com sucesso!', 'sucesso'); 
+            document.getElementById('pagamentoModal').style.display = 'none'; 
+            if (clienteSelecionadoId) carregarHistoricoOrcamentos(clienteSelecionadoId); 
+            carregarPainelProducao(); 
+        } else { 
+            throw new Error('Falha ao registrar o pagamento.'); 
+        } 
+    } catch (error) { mostrarNotificacao(error.message, 'erro'); } 
+}
 function novoOrcamento() { itensOrcamento = []; renderizarTabelaItens(); document.getElementById('itemDescricao').value = ''; document.getElementById('itemQuantidade').value = '1'; document.getElementById('itemValorUnitario').value = ''; document.getElementById('observacoes').value = 'Forma de pagamento: 50% na encomenda e 50% na entrega. Prazo de entrega: 30 dias a partir da confirmação do pedido.'; orcamentoAtualId = null; mostrarNotificacao('Formulário limpo. Pronto para um novo orçamento!', 'info'); }
 
 // --- INICIALIZAÇÃO E EVENTOS ---
@@ -175,22 +95,50 @@ function conectarEventosApp() {
     document.getElementById('totaisContainer').addEventListener('input', (e) => { if (e.target && e.target.id === 'descontoValor') { atualizarTotais(); } });
     document.getElementById('totaisContainer').addEventListener('change', (e) => { if (e.target && e.target.id === 'descontoTipo') { atualizarTotais(); } });
     
-    // Listener do Histórico ATUALIZADO para incluir botão Excluir
-    document.getElementById('historico-container').addEventListener('click', (e) => {
-        const target = e.target.closest('button');
-        if (!target) return;
+    document.getElementById('historico-container').addEventListener('click', (e) => { 
+        const target = e.target.closest('button'); 
+        if (!target) return; 
         const orcamentoId = target.dataset.id; 
         orcamentoParaAcaoId = orcamentoId; // Guarda o ID para qualquer ação
         
         if (target.classList.contains('btn-ver-pdf')) { gerarPdfHistorico(orcamentoId); }
         else if (target.classList.contains('btn-editar-orcamento')) { carregarOrcamentoParaEdicao(orcamentoId); }
-        else if (target.classList.contains('btn-registrar-pagamento-hist')) { const total = parseFloat(target.dataset.total); const pago = parseFloat(target.dataset.pago); document.getElementById('pagamentoModalTitle').textContent = `Saldo Devedor: ${formatarMoeda(total - pago)}`; document.getElementById('pagamentoModal').style.display = 'flex'; }
-        else if (target.classList.contains('btn-iniciar-producao')) { const totalPago = parseFloat(target.dataset.pago); if (totalPago <= 0) { mostrarNotificacao('ERRO: Pagamento inicial não registrado.', 'erro'); return; } document.getElementById('ocModal').style.display = 'flex'; }
+        else if (target.classList.contains('btn-registrar-pagamento-hist')) { 
+            const total = parseFloat(target.dataset.total); 
+            const pago = parseFloat(target.dataset.pago); 
+            saldoDevedorAtual = total - pago; // Guarda o saldo atual
+            document.getElementById('pagamentoModalTitle').textContent = `Saldo Devedor: ${formatarMoeda(saldoDevedorAtual)}`; 
+            // Preenche o campo com o saldo devedor
+            const inputValor = document.getElementById('inputValorPago');
+            inputValor.value = saldoDevedorAtual.toFixed(2).replace('.', ',');
+            formatarCampoMoeda(inputValor); // Aplica a máscara
+            document.getElementById('inputObsPagamento').value = ''; // Limpa obs
+            document.getElementById('pagamentoModal').style.display = 'flex'; 
+        }
+        else if (target.classList.contains('btn-iniciar-producao')) { const totalPago = parseFloat(target.dataset.pago); if (totalPago <= 0) { mostrarNotificacao('ERRO: Pagamento inicial não registrado.', 'erro'); return; } document.getElementById('inputNumeroOC').value = ''; document.getElementById('ocModal').style.display = 'flex'; } 
         else if (target.classList.contains('btn-avancar-status')) { const novoStatus = target.dataset.status; atualizarStatusOrcamento(orcamentoId, novoStatus); }
-        else if (target.classList.contains('btn-excluir-orcamento')) { excluirOrcamento(orcamentoId); } // Chama a função de excluir
+        else if (target.classList.contains('btn-excluir-orcamento')) { excluirOrcamento(orcamentoId); } 
     });
 
-    document.getElementById('kanban-board').addEventListener('click', (e) => { const target = e.target.closest('button'); if (!target) return; orcamentoParaAcaoId = target.dataset.id; if (target.classList.contains('btn-visualizar-kanban')) { alternarAbas('gerador'); carregarOrcamentoParaEdicao(orcamentoParaAcaoId); } if (target.classList.contains('btn-registrar-pagamento')) { const total = parseFloat(target.dataset.total); const pago = parseFloat(target.dataset.pago); document.getElementById('pagamentoModalTitle').textContent = `Saldo Devedor: ${formatarMoeda(total - pago)}`; document.getElementById('pagamentoModal').style.display = 'flex'; } });
+    document.getElementById('kanban-board').addEventListener('click', (e) => { 
+        const target = e.target.closest('button'); 
+        if (!target) return; 
+        orcamentoParaAcaoId = target.dataset.id; 
+        if (target.classList.contains('btn-visualizar-kanban')) { alternarAbas('gerador'); carregarOrcamentoParaEdicao(orcamentoParaAcaoId); } 
+        if (target.classList.contains('btn-registrar-pagamento')) { 
+            const total = parseFloat(target.dataset.total); 
+            const pago = parseFloat(target.dataset.pago); 
+            saldoDevedorAtual = total - pago; // Guarda o saldo atual
+            document.getElementById('pagamentoModalTitle').textContent = `Saldo Devedor: ${formatarMoeda(saldoDevedorAtual)}`; 
+            // Preenche o campo com o saldo devedor
+            const inputValor = document.getElementById('inputValorPago');
+            inputValor.value = saldoDevedorAtual.toFixed(2).replace('.', ',');
+            formatarCampoMoeda(inputValor); // Aplica a máscara
+            document.getElementById('inputObsPagamento').value = ''; // Limpa obs
+            document.getElementById('pagamentoModal').style.display = 'flex'; 
+        } 
+    });
+
     document.getElementById('btnConfirmarOC').addEventListener('click', () => { const numeroOC = document.getElementById('inputNumeroOC').value; if (!numeroOC) { mostrarNotificacao('O número da OC é obrigatório.', 'erro'); return; } atualizarStatusOrcamento(orcamentoParaAcaoId, 'Em Produção', { numero_oc: numeroOC }); document.getElementById('ocModal').style.display = 'none'; });
     document.getElementById('btnSalvarPagamento').addEventListener('click', salvarPagamento);
     document.getElementById('inputValorPago').addEventListener('input', (e) => formatarCampoMoeda(e.target));
