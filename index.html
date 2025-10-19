@@ -79,7 +79,6 @@
                 </div>
                 <div class="section" style="text-align: center;">
                     <button type="button" class="btn btn-secondary" id="btnNovoOrcamento" style="background: #adb5bd;">✨ Novo Orçamento</button> 
-                    
                     <button type="button" class="btn btn-success" id="btnGerarPDF">📄 Gerar PDF</button>
                     <button type="button" class="btn btn-primary" id="btnSalvarOrcamento" style="background: linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%);">💾 Salvar Orçamento</button>
                 </div>
@@ -99,11 +98,34 @@
                 </div>
             </div>
         </div>
-        <div style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 15px; font-size: 11px;">v1.3.8</div>
+        <div style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 15px; font-size: 11px;">v1.3.12</div>
     </div>
     
-    <div id="ocModal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><h2>Iniciar Produção</h2><p>Insira o número da Ordem de Compra (OC).</p></div><div class="form-group"><label for="inputNumeroOC">Número da OC</label><input type="text" id="inputNumeroOC" placeholder="Ex: OC-2025-123"></div><div class="modal-footer" style="padding-top: 20px;"><button id="btnConfirmarOC" class="btn btn-success">Confirmar e Iniciar</button><button class="btn-close" data-modal-id="ocModal">Cancelar</button></div></div></div>
-    <div id="pagamentoModal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><h2>Registrar Pagamento</h2><p id="pagamentoModalTitle"></p></div><div class="form-grid"><div class="form-group"><label for="inputValorPago">Valor Pago (R$)</label><input type="text" id="inputValorPago"></div><div class="form-group"><label for="selectMetodoPagamento">Método</label><select id="selectMetodoPagamento"><option>Pix</option><option>Boleto</option><option>Cartão</option><option>Dinheiro</option></select></div></div><div class="form-group"><label for="inputObsPagamento">Observações</label><textarea id="inputObsPagamento"></textarea></div><div class="modal-footer"><button id="btnSalvarPagamento" class="btn btn-success">Salvar Pagamento</button><button class="btn-close" data-modal-id="pagamentoModal">Cancelar</button></div></div></div>
+    <div id="ocModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header"><h2>Iniciar Produção</h2><p>Insira o número da Ordem de Compra (OC).</p></div>
+            <div class="form-group"><label for="inputNumeroOC">Número da OC</label><input type="text" id="inputNumeroOC" placeholder="Ex: OC-2025-123"></div>
+            <div class="modal-footer" style="padding-top: 20px;">
+                <button id="btnConfirmarOC" class="btn btn-success">Confirmar e Iniciar</button>
+                <button class="btn btn-secondary btn-close" data-modal-id="ocModal">Cancelar</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="pagamentoModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header"><h2>Registrar Pagamento</h2><p id="pagamentoModalTitle"></p></div>
+            <div class="form-grid">
+                <div class="form-group"><label for="inputValorPago">Valor Pago (R$)</label><input type="text" id="inputValorPago"></div>
+                <div class="form-group"><label for="selectMetodoPagamento">Método</label><select id="selectMetodoPagamento"><option>Pix</option><option>Boleto</option><option>Cartão</option><option>Dinheiro</option></select></div>
+            </div>
+            <div class="form-group"><label for="inputObsPagamento">Observações</label><textarea id="inputObsPagamento"></textarea></div>
+            <div class="modal-footer">
+                <button id="btnSalvarPagamento" class="btn btn-success">Salvar Pagamento</button>
+                <button class="btn btn-secondary btn-close" data-modal-id="pagamentoModal">Cancelar</button>
+            </div>
+        </div>
+    </div>
 
     <script src="script.js"></script>
 </body>
